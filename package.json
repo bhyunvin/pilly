@@ -1,0 +1,27 @@
+{
+  "name": "pilly",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "sonar": "sonar-scanner",
+    "test:api": "cd apps/api && bun test",
+    "test:web": "cd apps/web && bun test",
+    "test": "turbo run test",
+    "perf": "unlighthouse --site http://localhost:3000"
+  },
+  "devDependencies": {
+    "@unlighthouse/cli": "^0.17.9",
+    "prettier": "3.8.1",
+    "sonarqube-scanner": "^4.3.5",
+    "turbo": "2.9.4"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "bun@1.2.4"
+}
