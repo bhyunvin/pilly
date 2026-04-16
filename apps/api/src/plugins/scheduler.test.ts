@@ -43,7 +43,7 @@ describe('Account Hard-Delete Scheduler Logic', () => {
     ];
 
     const deletePromises = attachments.map(async (att) => {
-      // 상단에서 모킹된 인스턴스를 직접 참조하여 @ts-ignore 제거
+      // 상단에서 모킹된 인스턴스를 직접 참조하도록 우회 린트 위반을 제거함
       const { cloudinaryService } = await import('../services/cloudinary.service');
       const publicId = cloudinaryService.extractPublicIdFromUrl(att.fileUrl);
       if (publicId) {

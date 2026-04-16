@@ -1,16 +1,18 @@
-import { ERROR_MESSAGES } from '../utils/constants';
+import { ERROR_MESSAGES, USER_ROLE, USER_STATUS, ACCESS_EXPIRATION_TIME } from '../utils/constants';
 import { Elysia, t } from 'elysia';
 import { db } from '../db';
 import {
   chatAccessApprovals,
   aiChatLogs,
   userProfiles,
+  chatSessions,
   userRestrictionHistory,
 } from '../db/schema';
 import { authPlugin } from '../middleware/auth';
 import { updatePillDatabase } from '../scripts/syncPills';
 import { eq, desc } from 'drizzle-orm';
-import { USER_ROLE, USER_STATUS, ACCESS_EXPIRATION_TIME } from '../utils/constants';
+import { sendAccessAlertEmail } from '../utils/mail';
+import { decrypt } from '../utils/security';
 
 export const createAdminRoutes = (auth = authPlugin) =>
   new Elysia({ prefix: '/admin' })
@@ -45,7 +47,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
       const profile = await db
         .select()
         .from(userProfiles)
-        .where(eq(userProfiles.userId, userId as string))
+        .where(eq(userProfiles.userId, userId))
         .limit(1);
 
       if (profile.length === 0 || profile[0].role !== USER_ROLE.ADMIN) {
@@ -190,7 +192,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
 
             await tx.insert(userRestrictionHistory).values({
               userId: params.userId,
-              adminId: currentAdminId as string,
+              adminId: currentAdminId,
               reason: reason || DEFAULT_RESTRICTED_REASON,
             });
           });
@@ -228,7 +230,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
     .get(
       '/chat/:sessionId',
       async ({ params, set }) => {
-        const sessionId = parseInt(params.sessionId);
+        const sessionId = Number.parseInt(params.sessionId);
         const approvals = await db
           .select()
           .from(chatAccessApprovals)
@@ -243,24 +245,44 @@ export const createAdminRoutes = (auth = authPlugin) =>
         }
 
         const now = new Date();
-        if (!approval.accessedAt) {
+        if (approval.accessedAt) {
+          if (approval.expiresAt && now > approval.expiresAt) {
+            set.status = 403;
+            return { success: false, message: '접근 권한이 만료되었습니다.' };
+          }
+        } else {
           const expiresAt = new Date(now.getTime() + ACCESS_EXPIRATION_TIME);
           await db
             .update(chatAccessApprovals)
             .set({ accessedAt: now, expiresAt: expiresAt })
             .where(eq(chatAccessApprovals.id, approval.id));
-        } else {
-          if (approval.expiresAt && now > approval.expiresAt) {
-            set.status = 403;
-            return { success: false, message: '접근 권한이 만료되었습니다.' };
+
+          // 이메일 주소 확보를 위해 문의한 유저 프로필 조회. (현재 schema.ts에 email이 없어 임시 조치)
+          const sessionUser = await db
+            .select()
+            .from(chatSessions)
+            .where(eq(chatSessions.id, sessionId))
+            .limit(1);
+
+          if (sessionUser.length > 0) {
+            // Note: schema.ts의 userProfiles에 email 필드 추가 후 연동
+            const dummyEmail = `user-${sessionUser[0].userId}@pilly.local`;
+            await sendAccessAlertEmail(dummyEmail, sessionId);
           }
         }
 
-        const chatLogs = await db
+        const chatLogsRaw = await db
           .select()
           .from(aiChatLogs)
           .where(eq(aiChatLogs.sessionId, sessionId))
           .orderBy(aiChatLogs.createdAt);
+
+        // 복호화 파이프라인
+        const chatLogs = chatLogsRaw.map((log) => ({
+          ...log,
+          prompt: decrypt(log.prompt),
+          response: decrypt(log.response),
+        }));
 
         return { success: true, logs: chatLogs };
       },

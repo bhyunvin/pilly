@@ -5,6 +5,7 @@ import { eq, desc } from 'drizzle-orm';
 import { authPlugin } from '../middleware/auth';
 import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
+import { encrypt } from '../utils/security';
 
 /**
  * 채팅 히스토리 메시지 구조 정의
@@ -92,11 +93,13 @@ export const createChatRoutes = (app: Elysia) => {
           const lastUserMessage = [...history].reverse().find((msg) => msg.role === 'user');
           const userPrompt = lastUserMessage?.parts[0].text || '';
 
-          // AI SDK 호환 메시지 포맷으로 변환
-          const messages = history.map((msg) => ({
-            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: msg.parts[0].text,
-          }));
+          // AI SDK 호환 메시지 포맷으로 변환 (엄격한 리터럴 타입 명시)
+          const messages: { role: 'user' | 'assistant'; content: string }[] = history.map(
+            (msg) => ({
+              role: msg.role === 'user' ? 'user' : 'assistant',
+              content: msg.parts[0].text,
+            }),
+          );
 
           // 1. 대화 기록 레코드 선행 생성 (질문 유실 방지)
           const [logRecord] = await db
@@ -104,7 +107,7 @@ export const createChatRoutes = (app: Elysia) => {
             .values({
               sessionId,
               userId,
-              prompt: userPrompt,
+              prompt: encrypt(userPrompt),
               response: '', // 답변 전 임시 상태
             })
             .returning();
@@ -118,7 +121,7 @@ export const createChatRoutes = (app: Elysia) => {
               // 2. 답변 완료 시 해당 레코드 업데이트
               await db
                 .update(aiChatLogs)
-                .set({ response: text })
+                .set({ response: encrypt(text) })
                 .where(eq(aiChatLogs.id, logRecord.id));
             },
           });

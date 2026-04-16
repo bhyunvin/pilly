@@ -9,18 +9,18 @@ describe('Database Schema Integrity Audit', () => {
 
     // 2. 인덱스 목록 중 'nickname' 컬럼에 대한 유니크 인덱스가 존재하는지 확인
     const uniqueIdx = config.indexes.find((idx) => {
-      const idxConfig = idx.config as unknown as Record<string, unknown>;
-      const columns = idxConfig.columns as Array<{ name: string }>;
-      const isNickname = columns.some((col) => col.name === 'nickname');
-      const isUnique = idxConfig.unique === true;
+      const columns = idx.config.columns;
+      const isNickname = columns.some((col) => {
+        // 타입가드를 통해 안전하게 name 프로퍼티 확인
+        return col && typeof col === 'object' && 'name' in col && col.name === 'nickname';
+      });
+      const isUnique = idx.config.unique === true;
       return isNickname && isUnique;
     });
 
     expect(uniqueIdx).toBeDefined();
     if (uniqueIdx) {
-      const idxConfig = uniqueIdx.config as unknown as Record<string, unknown>;
-      const columns = idxConfig.columns as Array<{ name: string }>;
-      expect(columns).toHaveLength(1);
+      expect(uniqueIdx.config.columns).toHaveLength(1);
     }
   });
 
@@ -31,8 +31,7 @@ describe('Database Schema Integrity Audit', () => {
     const userIdCol = config.columns.find((c) => c.name === 'user_id');
     expect(userIdCol).toBeDefined();
     if (userIdCol) {
-      const col = userIdCol as unknown as Record<string, unknown>;
-      expect(col.primary).toBe(true);
+      expect(userIdCol.primary).toBe(true);
     }
   });
 });
