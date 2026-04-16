@@ -100,6 +100,7 @@ pilly/
 
 5. **Start Development Server:**
    Run both the frontend and backend concurrently from the root:
+
    ```bash
    bun run dev
    ```
