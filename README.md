@@ -35,11 +35,11 @@ Pilly is built as a high-performance monorepo, ensuring code sharing and rapid i
 We pride ourselves on delivering a robust, scalable, and accessible application:
 
 - **100% Type Safety:** Achieved absolute type integrity across the full stack by eliminating all `as any` and `@ts-ignore` assertions.
-- **Performance Optimized:** 
+- **Performance Optimized:**
   - Strict adherence to Core Web Vitals (LCP/CLS).
   - Lazy loading of heavy UI components (modals, sheets) via `next/dynamic`.
   - Optimized local font loading (Pretendard) to prevent layout shifts.
-- **Responsive Design & Accessibility (A11y):** 
+- **Responsive Design & Accessibility (A11y):**
   - Mobile-First methodology.
   - Implementation of `100dvh` for accurate mobile viewport rendering.
   - Explicit safe-area handling (`env(safe-area-inset-bottom)`).
@@ -71,24 +71,28 @@ pilly/
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/your-username/pilly.git
    cd pilly
    ```
 
 2. **Install dependencies:**
+
    ```bash
    bun install
    ```
 
 3. **Environment Setup:**
    Copy the example environment files and fill in your specific credentials (Database URL, API Keys, etc.).
+
    ```bash
    cp .env.example .env
    # You may also need to setup specific .env files in apps/api and apps/web
    ```
 
 4. **Database Migration:**
+
    ```bash
    cd apps/api
    bun run db:push
@@ -99,6 +103,7 @@ pilly/
    ```bash
    bun run dev
    ```
+
    - Web App: http://localhost:3000
    - API Server: http://localhost:4000
 
