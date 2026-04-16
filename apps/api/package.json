@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
+    "dev": "drizzle-kit push && bun run --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist",
     "db:push": "drizzle-kit push",
     "test": "bun test",
