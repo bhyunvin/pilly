@@ -20,43 +20,62 @@ export const medicationStatusEnum = pgEnum('medication_status', [
 ]);
 export const inquiryStatusEnum = pgEnum('inquiry_status', ['PENDING', 'RESOLVED']);
 
-export const userMedications = pgTable('user_medications', {
-  id: serial('id').primaryKey(),
-  userId: varchar('user_id', { length: 255 }).notNull(),
-  name: text('name').notNull(),
-  dosage: text('dosage'),
-  frequency: text('frequency'),
-  startDate: text('start_date'),
-  endDate: text('end_date'),
-  status: text('status').default('TAKING'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const userMedications = pgTable(
+  'user_medications',
+  {
+    id: serial('id').primaryKey(),
+    userId: varchar('user_id', { length: 255 }).notNull(),
+    name: text('name').notNull(),
+    dosage: text('dosage'),
+    frequency: text('frequency'),
+    startDate: text('start_date'),
+    endDate: text('end_date'),
+    status: text('status').default('TAKING'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [index('user_medications_user_id_idx').on(table.userId)],
+);
 
-export const medicationHistory = pgTable('medication_history', {
-  id: serial('id').primaryKey(),
-  medicationId: integer('medication_id').references(() => userMedications.id, {
-    onDelete: 'cascade',
-  }),
-  status: medicationStatusEnum('status').default('PENDING'),
-  takenAt: timestamp('taken_at').defaultNow(),
-});
+export const medicationHistory = pgTable(
+  'medication_history',
+  {
+    id: serial('id').primaryKey(),
+    medicationId: integer('medication_id').references(() => userMedications.id, {
+      onDelete: 'cascade',
+    }),
+    status: medicationStatusEnum('status').default('PENDING'),
+    takenAt: timestamp('taken_at').defaultNow(),
+  },
+  (table) => [index('medication_history_medication_id_idx').on(table.medicationId)],
+);
 
-export const chatSessions = pgTable('chat_sessions', {
-  id: serial('id').primaryKey(),
-  userId: varchar('user_id', { length: 255 }).notNull(),
-  title: text('title'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+export const chatSessions = pgTable(
+  'chat_sessions',
+  {
+    id: serial('id').primaryKey(),
+    userId: varchar('user_id', { length: 255 }).notNull(),
+    title: text('title'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [index('chat_sessions_user_id_idx').on(table.userId)],
+);
 
-export const aiChatLogs = pgTable('ai_chat_logs', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => chatSessions.id, { onDelete: 'cascade' }),
-  userId: varchar('user_id', { length: 255 }).notNull(),
-  prompt: text('prompt').notNull(),
-  response: text('response').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const aiChatLogs = pgTable(
+  'ai_chat_logs',
+  {
+    id: serial('id').primaryKey(),
+    sessionId: integer('session_id').references(() => chatSessions.id, { onDelete: 'cascade' }),
+    userId: varchar('user_id', { length: 255 }).notNull(),
+    prompt: text('prompt').notNull(),
+    response: text('response').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('ai_chat_logs_session_id_idx').on(table.sessionId),
+    index('ai_chat_logs_user_id_idx').on(table.userId),
+  ],
+);
 
 export const chatSessionsRelations = relations(chatSessions, ({ many }) => ({
   logs: many(aiChatLogs),
@@ -93,50 +112,62 @@ export const pillCatalog = pgTable(
     itemImage: text('item_image'),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (table) => ({
-    itemNameIdx: index('item_name_idx').on(table.itemName),
-    drugShapeIdx: index('drug_shape_idx').on(table.drugShape),
-    colorIdx: index('color_idx').on(table.colorClass1),
-  }),
+  (table) => [
+    index('item_name_idx').on(table.itemName),
+    index('drug_shape_idx').on(table.drugShape),
+    index('color_idx').on(table.colorClass1),
+  ],
 );
 
-export const chatAccessApprovals = pgTable('chat_access_approvals', {
-  id: uuid('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar('user_id', { length: 255 }).notNull(),
-  chatSessionId: integer('chat_session_id').references(() => chatSessions.id, {
-    onDelete: 'cascade',
-  }),
-  grantedAt: timestamp('granted_at').defaultNow().notNull(),
-  accessedAt: timestamp('accessed_at'),
-  expiresAt: timestamp('expires_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const chatAccessApprovals = pgTable(
+  'chat_access_approvals',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id', { length: 255 }).notNull(),
+    chatSessionId: integer('chat_session_id').references(() => chatSessions.id, {
+      onDelete: 'cascade',
+    }),
+    grantedAt: timestamp('granted_at').defaultNow().notNull(),
+    accessedAt: timestamp('accessed_at'),
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [index('chat_access_approvals_chat_session_id_idx').on(table.chatSessionId)],
+);
 
-export const userInquiries = pgTable('user_inquiries', {
-  id: serial('id').primaryKey(),
-  userId: varchar('user_id', { length: 255 }).notNull(),
-  chatSessionId: integer('chat_session_id').references(() => chatSessions.id, {
-    onDelete: 'cascade',
-  }),
-  title: varchar('title', { length: 255 }).notNull(),
-  content: text('content').notNull(),
-  allowChatAccess: boolean('allow_chat_access').default(false),
-  chatAccessId: uuid('chat_access_id').references(() => chatAccessApprovals.id, {
-    onDelete: 'cascade',
-  }),
-  status: inquiryStatusEnum('status').default('PENDING'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const userInquiries = pgTable(
+  'user_inquiries',
+  {
+    id: serial('id').primaryKey(),
+    userId: varchar('user_id', { length: 255 }).notNull(),
+    chatSessionId: integer('chat_session_id').references(() => chatSessions.id, {
+      onDelete: 'cascade',
+    }),
+    title: varchar('title', { length: 255 }).notNull(),
+    content: text('content').notNull(),
+    allowChatAccess: boolean('allow_chat_access').default(false),
+    chatAccessId: uuid('chat_access_id').references(() => chatAccessApprovals.id, {
+      onDelete: 'cascade',
+    }),
+    status: inquiryStatusEnum('status').default('PENDING'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [index('user_inquiries_user_id_idx').on(table.userId)],
+);
 
-export const inquiryAttachments = pgTable('inquiry_attachments', {
-  id: serial('id').primaryKey(),
-  inquiryId: integer('inquiry_id').references(() => userInquiries.id, { onDelete: 'cascade' }),
-  fileUrl: text('file_url').notNull(),
-  originalName: text('original_name').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+export const inquiryAttachments = pgTable(
+  'inquiry_attachments',
+  {
+    id: serial('id').primaryKey(),
+    inquiryId: integer('inquiry_id').references(() => userInquiries.id, { onDelete: 'cascade' }),
+    fileUrl: text('file_url').notNull(),
+    originalName: text('original_name').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [index('inquiry_attachments_inquiry_id_idx').on(table.inquiryId)],
+);
 
 export const userProfiles = pgTable(
   'user_profiles',
@@ -152,9 +183,7 @@ export const userProfiles = pgTable(
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (table) => ({
-    nicknameUniqueIdx: uniqueIndex('nickname_unique_idx').on(table.nickname),
-  }),
+  (table) => [uniqueIndex('nickname_unique_idx').on(table.nickname)],
 );
 
 export const userRestrictionHistory = pgTable('user_restriction_history', {
