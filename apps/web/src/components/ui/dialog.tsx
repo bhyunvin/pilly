@@ -7,23 +7,53 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { XIcon } from 'lucide-react';
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
+/**
+ * @description 화면 중앙에 나타나는 모달 대화 상자 컴포넌트의 루트입니다.
+ *
+ * @param {DialogPrimitive.Root.Props} props - Dialog 루트 속성
+ * @returns {JSX.Element} Dialog 컨텍스트를 제공하는 루트 요소를 반환합니다.
+ */
+function Dialog({ ...props }: Readonly<DialogPrimitive.Root.Props>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
-function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
+/**
+ * @description Dialog를 여는 트리거 버튼입니다.
+ *
+ * @param {DialogPrimitive.Trigger.Props} props - Dialog 트리거 속성
+ * @returns {JSX.Element} 트리거 요소를 반환합니다.
+ */
+function DialogTrigger({ ...props }: Readonly<DialogPrimitive.Trigger.Props>) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
-function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
+/**
+ * @description Dialog를 DOM의 별도 위치로 렌더링하기 위한 포털입니다.
+ *
+ * @param {DialogPrimitive.Portal.Props} props - 포털 속성
+ * @returns {JSX.Element} 포털 요소를 반환합니다.
+ */
+function DialogPortal({ ...props }: Readonly<DialogPrimitive.Portal.Props>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
-function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
+/**
+ * @description Dialog를 닫는 버튼입니다.
+ *
+ * @param {DialogPrimitive.Close.Props} props - Dialog 닫기 속성
+ * @returns {JSX.Element} 닫기 요소를 반환합니다.
+ */
+function DialogClose({ ...props }: Readonly<DialogPrimitive.Close.Props>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) {
+/**
+ * @description Dialog 뒤에 나타나는 반투명 배경 레이어입니다.
+ *
+ * @param {DialogPrimitive.Backdrop.Props} props - 오버레이 속성
+ * @returns {JSX.Element} 배경 레이어 요소를 반환합니다.
+ */
+function DialogOverlay({ className, ...props }: Readonly<DialogPrimitive.Backdrop.Props>) {
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
@@ -36,6 +66,13 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
   );
 }
 
+/**
+ * @description Dialog의 실제 콘텐츠를 담는 컨테이너 컴포넌트입니다.
+ * 화면 중앙에 위치하며 애니메이션 효과와 닫기 버튼을 포함할 수 있습니다.
+ *
+ * @param {DialogPrimitive.Popup.Props & { showCloseButton?: boolean; }} props - 콘텐츠 속성 및 닫기 버튼 표시 여부
+ * @returns {JSX.Element} 스타일이 적용된 모달 콘텐츠 패널을 반환합니다.
+ */
 function DialogContent({
   className,
   children,
@@ -70,12 +107,24 @@ function DialogContent({
   );
 }
 
+/**
+ * @description Dialog 상단의 제목과 부가 정보를 위한 영역입니다.
+ *
+ * @param {React.ComponentProps<'div'>} props - div 속성
+ * @returns {JSX.Element} 헤더 영역을 반환합니다.
+ */
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="dialog-header" className={cn('flex flex-col gap-2', className)} {...props} />
   );
 }
 
+/**
+ * @description Dialog 하단의 액션 버튼 등을 위한 영역입니다.
+ *
+ * @param {React.ComponentProps<'div'> & { showCloseButton?: boolean; }} props - div 속성 및 닫기 버튼 표시 여부
+ * @returns {JSX.Element} 푸터 영역을 반환합니다.
+ */
 function DialogFooter({
   className,
   showCloseButton = false,
@@ -101,7 +150,13 @@ function DialogFooter({
   );
 }
 
-function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
+/**
+ * @description Dialog의 제목을 정의하는 컴포넌트입니다.
+ *
+ * @param {DialogPrimitive.Title.Props} props - 제목 속성
+ * @returns {JSX.Element} 스타일이 적용된 제목 요소를 반환합니다.
+ */
+function DialogTitle({ className, ...props }: Readonly<DialogPrimitive.Title.Props>) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
@@ -111,7 +166,13 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   );
 }
 
-function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {
+/**
+ * @description Dialog의 상세 설명을 제공하는 컴포넌트입니다.
+ *
+ * @param {DialogPrimitive.Description.Props} props - 설명 속성
+ * @returns {JSX.Element} 스타일이 적용된 설명 요소를 반환합니다.
+ */
+function DialogDescription({ className, ...props }: Readonly<DialogPrimitive.Description.Props>) {
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"

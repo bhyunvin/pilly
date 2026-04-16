@@ -10,6 +10,13 @@ import { createProfileRoutes } from './routes/profile';
 import { createAdminRoutes } from './routes/admin';
 import { schedulerPlugin } from './plugins/scheduler';
 
+/**
+ * Pilly 백엔드 서비스의 핵심 Elysia 애플리케이션 인스턴스입니다.
+ *
+ * @description
+ * Swagger(API 문서화), CORS, 전역 에러 핸들러, 스케줄러 등을 설정하고
+ * `/api/v1` 경로 아래에 각 도메인별 라우트(프로필, 채팅, 복약, 검색 등)를 통합합니다.
+ */
 const app = new Elysia()
   .use(
     swagger({
@@ -23,6 +30,17 @@ const app = new Elysia()
     }),
   )
   .use(cors())
+  /**
+   * 전역 에러 핸들러입니다.
+   *
+   * @description
+   * 애플리케이션 내부에서 발생하는 모든 에러를 포착하여 정제된 응답을 반환합니다.
+   * 보안을 위해 구체적인 서버 내부 오류 정보는 노출하지 않고 로그에만 기록합니다.
+   *
+   * @param {string} code - 에러 코드 (예: 'NOT_FOUND', 'VALIDATION')
+   * @param {Error} error - 발생한 에러 객체
+   * @param {Function} set - 응답 상태 코드 설정을 위한 객체
+   */
   .onError(({ code, error, set }) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[API Error] Code: ${code}, Message: ${errorMessage}`);

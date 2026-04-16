@@ -3,6 +3,10 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * @description 버튼의 시각적 스타일과 크기를 정의하는 variants 설정입니다.
+ * 다양한 배경색(default, outline, ghost 등)과 크기(sm, lg, icon 등) 조합을 지원합니다.
+ */
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
@@ -40,6 +44,13 @@ const buttonVariants = cva(
   },
 );
 
+/**
+ * @description 사용자 인터랙션을 위한 범용 버튼 컴포넌트입니다.
+ * Base UI의 Button Primitive를 기반으로 하며, 프로젝트의 디자인 시스템이 적용된 테마와 크기를 제공합니다.
+ *
+ * @param {ButtonPrimitive.Props & VariantProps<typeof buttonVariants>} props - 버튼 속성 및 스타일/크기 옵션
+ * @returns {JSX.Element} 스타일이 적용된 버튼 요소를 반환합니다.
+ */
 function Button({
   className,
   variant = 'default',

@@ -94,7 +94,7 @@ test.describe('MyPage User Journey (Nickname & Soft Delete)', () => {
 
     // /restore 페이지 이동 및 로딩 완료 대기
     await expect(page).toHaveURL(/\/restore/, { timeout: 15000 });
-    const restoreHeading = page.locator('h3:has-text("회원 탈퇴 유예 기간입니다")');
+    // restoreHeading 변수 할당 제거됨
     // CardTitle이 h3로 렌더링되는지 확인 (UI 라이브러리 구조에 따라 다름, 텍스트로 대체 가능)
     await expect(page.locator('text=회원 탈퇴 유예 기간입니다')).toBeVisible({ timeout: 20000 });
   });

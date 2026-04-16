@@ -44,6 +44,12 @@ interface UserProfile {
   restrictionHistory?: RestrictionHistory[];
 }
 
+/**
+ * 관리자용 사용자 관리 페이지 컴포넌트입니다.
+ * 전체 사용자 목록 조회, 상세 정보 확인, 권한 변경 및 이용 제한 등의 관리 기능을 수행합니다.
+ *
+ * @returns {JSX.Element} 사용자 관리 페이지 렌더링 결과
+ */
 export default function AdminUsersPage() {
   const { apiFetch } = useApi();
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -52,6 +58,12 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [restrictionReason, setRestrictionReason] = useState('');
 
+  /**
+   * 서버로부터 전체 사용자 목록을 비동기로 가져옵니다.
+   *
+   * @async
+   * @function fetchUsers
+   */
   const fetchUsers = useCallback(async () => {
     try {
       const httpResponse = await apiFetch('/admin/users');
@@ -67,6 +79,12 @@ export default function AdminUsersPage() {
     }
   }, [apiFetch]);
 
+  /**
+   * 특정 사용자의 상세 정보와 제재 이력을 비동기로 가져옵니다.
+   *
+   * @async
+   * @param {string} userId - 상세 정보를 조회할 사용자의 고유 ID
+   */
   const fetchUserDetails = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}`);
@@ -80,6 +98,12 @@ export default function AdminUsersPage() {
     }
   };
 
+  /**
+   * 사용자의 권한(USER/ADMIN)을 비동기로 전환합니다.
+   *
+   * @async
+   * @param {string} userId - 권한을 변경할 사용자의 고유 ID
+   */
   const toggleRole = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/role`, {
@@ -100,6 +124,12 @@ export default function AdminUsersPage() {
     }
   };
 
+  /**
+   * 특정 사용자의 서비스 이용을 비동기로 제한(정지)합니다.
+   *
+   * @async
+   * @param {string} userId - 이용을 제한할 사용자의 고유 ID
+   */
   const restrictUser = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {
@@ -120,6 +150,12 @@ export default function AdminUsersPage() {
     }
   };
 
+  /**
+   * 이용이 제한된 사용자의 계정을 비동기로 다시 활성화합니다.
+   *
+   * @async
+   * @param {string} userId - 활성화할 사용자의 고유 ID
+   */
   const activateUser = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {

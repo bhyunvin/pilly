@@ -6,10 +6,16 @@ import { authPlugin } from '../middleware/auth';
 
 /**
  * 의약품 검색 결과 인터페이스 정의
- * 식약처 카탈로그 데이터 모델을 나타냅니다.
+ * @description 식약처 카탈로그 데이터 모델을 나타냅니다.
  */
 type Pill = InferSelectModel<typeof pillCatalog>;
 
+/**
+ * 의약품 검색 응답 구조
+ * @interface SearchResponse
+ * @property {boolean} success - 요청 처리 성공 여부
+ * @property {Pill[]} pills - 검색 결과 약물 목록
+ */
 interface SearchResponse {
   success: boolean;
   pills: Pill[];
@@ -17,18 +23,22 @@ interface SearchResponse {
 
 /**
  * 의약품 통합 검색 API 라우트를 정의하는 그룹
- * 식약처 데이터를 기반으로 이름, 제형, 색상 필터링 검색을 수행합니다.
+ * @description 식약처 데이터를 기반으로 이름, 제형, 색상 필터링 검색을 수행합니다.
  *
- * @param app - Elysia 애플리케이션 인스턴스
- * @returns 검색 그룹 라우트가 추가된 인스턴스
+ * @param {Elysia} app - Elysia 애플리케이션 인스턴스
+ * @returns {Elysia} 검색 그룹 라우트가 추가된 인스턴스
  */
 export const createSearchRoutes = (app: Elysia) => {
   return app.group('/search', (group) =>
     group
       .use(authPlugin)
       /**
-       * 쿼리 파라미터로 전달된 조건에 따라 의약품 카탈로그를 검색합니다.
-       * 최대 50개의 결과를 반환합니다.
+       * 의약품 카탈로그 조건 검색
+       * @description 쿼리 파라미터(이름, 모양, 색상)로 전달된 조건에 따라 의약품 목록을 최대 50개까지 조회합니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {Object} context.query - 쿼리 스트링 (name, shape, color)
+       * @returns {Promise<SearchResponse>} 검색 결과 객체
        */
       .get(
         '/',

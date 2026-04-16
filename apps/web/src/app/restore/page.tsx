@@ -11,8 +11,10 @@ import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 /**
- * 계정 복구 페이지 컴포넌트
- * 탈퇴 유예 기간 중인 사용자가 계정을 복구하거나 상태를 확인할 수 있는 기능을 제공함
+ * 계정 복구 페이지 컴포넌트입니다.
+ * 탈퇴 유예 기간(30일) 중인 사용자가 자신의 탈퇴 상태를 확인하고 계정을 다시 활성화할 수 있는 기능을 제공합니다.
+ *
+ * @returns {JSX.Element} 계정 복구 페이지 렌더링 결과
  */
 export default function RestorePage() {
   const router = useRouter();
@@ -22,7 +24,10 @@ export default function RestorePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   /**
-   * 사용자 프로필을 조회하여 탈퇴 여부와 날짜를 확인함
+   * 사용자 프로필을 비동기로 조회하여 탈퇴 여부와 정확한 탈퇴 일시를 확인합니다.
+   *
+   * @async
+   * @function fetchProfile
    */
   const fetchProfile = useCallback(async () => {
     try {
@@ -53,7 +58,9 @@ export default function RestorePage() {
   }, [fetchProfile]);
 
   /**
-   * 계정 복구 요청을 수행함
+   * 탈퇴 진행 중인 계정의 복구 요청을 서버에 비동기로 수행합니다.
+   *
+   * @async
    */
   const handleRestore = async () => {
     if (isRestoring) return;

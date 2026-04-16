@@ -27,13 +27,20 @@ interface ChatVisualModalProps {
   onConfirm: () => void;
 }
 
+/**
+ * @description 이미지 인식을 통해 추출된 약품 목록을 사용자에게 확인받고 편집할 수 있게 하는 모달 컴포넌트입니다.
+ * 인식된 약품의 이름을 수정하거나, 저장할 약품을 선택할 수 있는 기능을 제공합니다.
+ *
+ * @param {ChatVisualModalProps} props - 모달 제어 상태, 분석된 약품 목록 및 제어 함수, 확인 콜백
+ * @returns {JSX.Element} 약품 목록 확인 및 편집 폼이 포함된 다이얼로그 모달을 반환합니다.
+ */
 export function ChatVisualModal({
   isOpen,
   onOpenChange,
   analyzedMeds,
   setAnalyzedMeds,
   onConfirm,
-}: ChatVisualModalProps) {
+}: Readonly<ChatVisualModalProps>) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-md bg-background">
@@ -43,13 +50,16 @@ export function ChatVisualModal({
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto space-y-4 py-4">
           {analyzedMeds.map((med, idx) => (
-            <div key={idx} className="flex items-start space-x-3 border p-3 rounded-lg">
+            <div
+              key={`${med.name}-${idx}`}
+              className="flex items-start space-x-3 border p-3 rounded-lg"
+            >
               <Checkbox
                 id={`med-check-${idx}`}
                 checked={med.checked}
                 onCheckedChange={(c) => {
                   const next = [...analyzedMeds];
-                  next[idx].checked = c as boolean;
+                  next[idx].checked = c === true;
                   setAnalyzedMeds(next);
                 }}
               />

@@ -2,6 +2,13 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * @description 여러 줄의 텍스트를 입력받기 위한 폼 요소입니다.
+ * 내용에 따라 높이가 자동으로 조절되며, 프로젝트 디자인 시스템에 맞춘 스타일이 적용되어 있습니다.
+ *
+ * @param {React.ComponentProps<'textarea'>} props - textarea 요소의 모든 표준 속성
+ * @returns {JSX.Element} 스타일이 적용된 textarea 요소를 반환합니다.
+ */
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea

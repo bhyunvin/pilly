@@ -5,8 +5,22 @@ import { userProfiles, userInquiries, inquiryAttachments } from '../db/schema';
 import { lt, inArray, eq } from 'drizzle-orm';
 import { cloudinaryService } from '../services/cloudinary.service';
 
+/**
+ * 삭제된 계정의 물리적 데이터를 유지하는 유예 기간(일)입니다.
+ * 이 기간이 지난 계정은 완전히 삭제(Hard Delete)됩니다.
+ */
 const GRACE_PERIOD_DAYS = 30;
 
+/**
+ * 데이터 정리를 위한 스케줄러 플러그인입니다.
+ *
+ * @description
+ * 매일 새벽 3시에 실행되어 유예 기간(30일)이 지난 삭제 요청 계정들을 DB에서 완전히 제거합니다.
+ * 또한 해당 계정과 관련된 문의 내역의 첨부파일을 Cloudinary에서 물리적으로 삭제하는 작업을 병행합니다.
+ * Cloudinary API 제한을 고려하여 50개 단위로 배치 처리를 수행합니다.
+ *
+ * @returns {Elysia} 스케줄러 기능이 포함된 Elysia 인스턴스
+ */
 export const schedulerPlugin = new Elysia().use(
   cron({
     name: 'user-cleanup',

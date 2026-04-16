@@ -28,8 +28,10 @@ import {
 import { AlertCircle, User, LogOut } from 'lucide-react';
 
 /**
- * 마이페이지 컴포넌트
- * 사용자 프로필 정보 조회, 닉네임 수정, 회원 탈퇴 기능을 제공함
+ * 마이페이지 컴포넌트입니다.
+ * 사용자 프로필 정보 조회, 닉네임 수정, 회원 탈퇴 기능을 제공합니다.
+ *
+ * @returns {JSX.Element} 마이페이지 렌더링 결과
  */
 export default function ProfilePage() {
   const router = useRouter();
@@ -44,6 +46,12 @@ export default function ProfilePage() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
 
+  /**
+   * 현재 로그인한 사용자의 프로필 정보를 서버로부터 비동기로 가져옵니다.
+   *
+   * @async
+   * @function fetchProfile
+   */
   const fetchProfile = useCallback(async () => {
     try {
       const { data: sessionData } = await authClient.getSession();
@@ -71,7 +79,13 @@ export default function ProfilePage() {
     fetchProfile();
   }, [fetchProfile]);
 
-  const handleUpdateNickname = async (e: React.FormEvent) => {
+  /**
+   * 변경된 닉네임을 서버에 비동기로 업데이트합니다.
+   *
+   * @async
+   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
+   */
+  const handleUpdateNickname = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setMessage({ text: '', type: '' });
@@ -96,6 +110,11 @@ export default function ProfilePage() {
     }
   };
 
+  /**
+   * 회원 탈퇴 사유를 제출하고 탈퇴 절차를 비동기로 시작합니다.
+   *
+   * @async
+   */
   const handleWithdraw = async () => {
     if (!withdrawalReason.trim()) {
       alert('탈퇴 사유를 입력해주세요.');

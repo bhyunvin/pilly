@@ -22,11 +22,23 @@ interface WithdrawalUser {
   deletionReason: string;
 }
 
+/**
+ * 관리자용 탈퇴 예정자 관리 페이지 컴포넌트입니다.
+ * 탈퇴를 요청한 사용자 목록과 데이터 영구 삭제 예정일을 조회할 수 있습니다.
+ *
+ * @returns {JSX.Element} 탈퇴 예정자 관리 페이지 렌더링 결과
+ */
 export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    /**
+     * 서버로부터 탈퇴 대기 중인 사용자 목록을 비동기로 가져옵니다.
+     *
+     * @async
+     * @function fetchWithdrawals
+     */
     const fetchWithdrawals = async () => {
       try {
         const { data: sessionData } = await authClient.getSession();

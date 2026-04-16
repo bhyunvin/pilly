@@ -2,17 +2,26 @@ import { authClient } from '@/lib/auth';
 import { useCallback } from 'react';
 
 /**
- * Pilly API 통신을 위한 공통 훅
- * 인증 헤더 및 베이스 URL(/api/v1 프리픽스 포함) 처리를 자동화함
+ * @description Pilly API 서버와의 통신을 관리하는 커스텀 훅입니다.
+ * 인증 세션 유지, 베이스 URL 설정, 공통 헤더(Authorization 등) 처리를 자동화하여 보안과 타입 안전성을 확보합니다.
+ *
+ * @returns {Object} API 요청을 위한 fetch 래퍼 함수를 반환합니다.
  */
 export const useApi = () => {
-  // 백엔드 라우트 그룹 설정에 맞춰 /api/v1 프리픽스 추가
+  /**
+   * @description 백엔드 서버의 베이스 URL입니다.
+   * 환경 변수 또는 로컬 호스트를 기준으로 /api/v1 프리픽스를 포함합니다.
+   */
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/api/v1';
 
   /**
-   * 인증이 필요한 API 요청을 수행하는 래퍼 함수
-   * @param endpoint - API 엔드포인트 (예: '/profile')
-   * @param options - fetch 옵션
+   * @description 인증 토큰을 자동으로 주입하여 API 요청을 수행하는 비동기 함수입니다.
+   * 요청 본문이 FormData가 아닐 경우 기본적으로 Content-Type을 application/json으로 설정합니다.
+   *
+   * @async
+   * @param {string} endpoint - 요청할 API 엔드포인트 경로 (예: '/profile')
+   * @param {RequestInit} [options={}] - fetch API에 전달할 추가 옵션
+   * @returns {Promise<Response>} API 응답 객체를 반환합니다.
    */
   const apiFetch = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {

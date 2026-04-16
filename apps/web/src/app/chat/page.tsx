@@ -13,6 +13,12 @@ interface ChatSession {
   createdAt: string;
 }
 
+/**
+ * AI 복약 상담 세션 목록 페이지 컴포넌트입니다.
+ * 사용자의 과거 상담 기록을 조회하고 새로운 상담 세션을 시작할 수 있는 기능을 제공합니다.
+ *
+ * @returns {JSX.Element} 채팅 세션 목록 페이지 렌더링 결과
+ */
 export default function ChatSessionsPage() {
   const router = useRouter();
   const { apiFetch } = useApi();
@@ -20,6 +26,12 @@ export default function ChatSessionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
+  /**
+   * 서버로부터 사용자의 모든 채팅 세션 목록을 비동기로 가져옵니다.
+   *
+   * @async
+   * @function fetchSessions
+   */
   const fetchSessions = useCallback(async () => {
     try {
       const res = await apiFetch('/chat/sessions');
@@ -39,6 +51,12 @@ export default function ChatSessionsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  /**
+   * 새로운 AI 상담 세션을 생성하고 해당 세션 페이지로 이동합니다.
+   *
+   * @async
+   * @function handleCreateSession
+   */
   const handleCreateSession = async () => {
     if (isCreating) return;
 
@@ -97,50 +115,47 @@ export default function ChatSessionsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2" role="list">
+      <ul className="grid gap-4 grid-cols-1 md:grid-cols-2">
         {sessions.length === 0 ? (
-          <div
-            role="listitem"
-            className="col-span-full py-12 text-center text-muted-foreground border rounded-lg bg-muted/10"
-          >
+          <li className="col-span-full py-12 text-center text-muted-foreground border rounded-lg bg-muted/10">
             상담 내역이 없습니다. 새로운 상담을 시작해 보세요.
-          </div>
+          </li>
         ) : (
           sessions.map((session) => (
-            <Card
-              key={session.id}
-              className="cursor-pointer hover:bg-muted/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              onClick={() => router.push(`/chat/${session.id}`)}
-              role="listitem"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  router.push(`/chat/${session.id}`);
-                }
-              }}
-              aria-label={`${session.title} 상담방 입장`}
-            >
-              <CardHeader className="p-4 flex flex-row items-center gap-4">
-                <div className="bg-primary/10 p-3 rounded-full text-primary">
-                  <MessageCircle size={20} aria-hidden="true" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">{session.title}</CardTitle>
-                  <CardDescription className="text-xs mt-1">
-                    {new Date(session.createdAt).toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
+            <li key={session.id} className="block list-none">
+              <Card
+                className="cursor-pointer hover:bg-muted/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                onClick={() => router.push(`/chat/${session.id}`)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    router.push(`/chat/${session.id}`);
+                  }
+                }}
+                aria-label={`${session.title} 상담방 입장`}
+              >
+                <CardHeader className="p-4 flex flex-row items-center gap-4">
+                  <div className="bg-primary/10 p-3 rounded-full text-primary">
+                    <MessageCircle size={20} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">{session.title}</CardTitle>
+                    <CardDescription className="text-xs mt-1">
+                      {new Date(session.createdAt).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+              </Card>
+            </li>
           ))
         )}
-      </div>
+      </ul>
     </div>
   );
 }

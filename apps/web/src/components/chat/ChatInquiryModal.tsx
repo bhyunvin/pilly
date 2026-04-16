@@ -22,7 +22,18 @@ interface ChatInquiryModalProps {
   sessionId: string;
 }
 
-export function ChatInquiryModal({ isOpen, onOpenChange, sessionId }: ChatInquiryModalProps) {
+/**
+ * @description 채팅 세션과 관련된 1:1 문의를 작성하고 제출하는 모달 컴포넌트입니다.
+ * 사용자는 제목, 내용, 첨부파일을 입력할 수 있으며, 관리자에게 해당 채팅 내역에 대한 접근 권한을 부여할지 선택할 수 있습니다.
+ *
+ * @param {ChatInquiryModalProps} props - 모달 제어 상태 및 세션 ID
+ * @returns {JSX.Element} 문의 폼이 포함된 다이얼로그 모달을 반환합니다.
+ */
+export function ChatInquiryModal({
+  isOpen,
+  onOpenChange,
+  sessionId,
+}: Readonly<ChatInquiryModalProps>) {
   const { apiFetch } = useApi();
   const [inquiryTitle, setInquiryTitle] = useState('');
   const [inquiryContent, setInquiryContent] = useState('');
@@ -30,7 +41,14 @@ export function ChatInquiryModal({ isOpen, onOpenChange, sessionId }: ChatInquir
   const [allowChatAccess, setAllowChatAccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * @description 문의 폼 제출을 처리하는 비동기 함수입니다.
+   * 입력된 데이터를 FormData로 구성하여 API로 전송하고, 성공 시 입력 필드를 초기화합니다.
+   *
+   * @async
+   * @param {React.FormEvent} e - 폼 제출 이벤트
+   */
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -111,7 +129,7 @@ export function ChatInquiryModal({ isOpen, onOpenChange, sessionId }: ChatInquir
             <Checkbox
               id="allow_chat"
               checked={allowChatAccess}
-              onCheckedChange={(c) => setAllowChatAccess(c as boolean)}
+              onCheckedChange={(checked) => setAllowChatAccess(checked === true)}
             />
             <Label htmlFor="allow_chat" className="text-sm cursor-pointer">
               대화 내역 열람 동의

@@ -1,5 +1,10 @@
 import Link from 'next/link';
 
+/**
+ * @description 페이지 하단에 위치하여 저작권 정보, 면책 조항, 약관 및 개인정보처리방침 링크를 제공하는 컴포넌트입니다.
+ *
+ * @returns {JSX.Element} 저작권 정보와 법적 링크가 포함된 푸터 영역을 반환합니다.
+ */
 export function Footer() {
   return (
     <footer className="border-t bg-background mt-auto py-6">

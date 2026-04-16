@@ -2,6 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { VisualFilters } from './VisualFilters';
 
+/**
+ * @description VisualFilters 컴포넌트의 UI 및 기능 명세를 검증하는 테스트 스위트입니다.
+ * 필터 옵션의 정상 렌더링 여부와 상태 변경에 따른 UI 표시를 테스트합니다.
+ */
 describe('VisualFilters Component UI Test', () => {
   const mockOnSelectShape = vi.fn();
   const mockOnSelectColor = vi.fn();

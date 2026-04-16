@@ -4,6 +4,10 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * @description 뱃지의 스타일 변형을 정의하는 variants 설정입니다.
+ * default, secondary, destructive, outline, ghost, link 등 다양한 시각적 스타일을 제공합니다.
+ */
 const badgeVariants = cva(
   'group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',
   {
@@ -24,6 +28,13 @@ const badgeVariants = cva(
   },
 );
 
+/**
+ * @description 강조 표시나 상태 정보를 나타내기 위한 뱃지 컴포넌트입니다.
+ * 작고 간결한 정보를 전달할 때 사용됩니다.
+ *
+ * @param {useRender.ComponentProps<'span'> & VariantProps<typeof badgeVariants>} props - 뱃지 속성 및 스타일 변형 옵션
+ * @returns {JSX.Element} 스타일이 적용된 뱃지 요소를 반환합니다.
+ */
 function Badge({
   className,
   variant = 'default',

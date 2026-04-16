@@ -17,6 +17,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
+/**
+ * 사용자의 로그인을 처리하고 약관 동의를 받는 페이지 컴포넌트입니다.
+ *
+ * @description
+ * 이메일 기반의 매직 링크 로그인 방식을 사용하며, 서비스 이용에 필요한
+ * 각종 약관(이용약관, 개인정보, 민감정보)에 대한 동의를 필수적으로 받습니다.
+ * 모든 필수 약관에 동의해야만 로그인 요청이 가능합니다.
+ *
+ * @returns {JSX.Element} 로그인 페이지 UI
+ */
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +41,12 @@ export default function LoginPage() {
 
   const allConsented = consents.terms && consents.privacy && consents.sensitive;
 
+  /**
+   * 입력된 이메일 주소로 로그인용 매직 링크 발송을 비동기로 요청합니다.
+   *
+   * @async
+   * @param {React.SyntheticEvent<HTMLFormElement>} e - 폼 제출 이벤트 객체
+   */
   const handleLogin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!allConsented) return;
@@ -56,6 +72,11 @@ export default function LoginPage() {
     }
   };
 
+  /**
+   * 모든 약관 동의 체크박스의 상태를 일괄적으로 변경합니다.
+   *
+   * @param {boolean} checked - 변경할 체크박스 상태
+   */
   const handleAllConsentChange = (checked: boolean) => {
     setConsents({
       all: checked,
@@ -65,6 +86,12 @@ export default function LoginPage() {
     });
   };
 
+  /**
+   * 개별 약관 동의 상태를 변경하고, 전체 동의 여부를 갱신합니다.
+   *
+   * @param {keyof typeof consents} key - 변경할 약관 항목 키
+   * @param {boolean} checked - 변경할 체크박스 상태
+   */
   const handleSingleConsentChange = (key: keyof typeof consents, checked: boolean) => {
     const newConsents = { ...consents, [key]: checked };
     newConsents.all = newConsents.terms && newConsents.privacy && newConsents.sensitive;

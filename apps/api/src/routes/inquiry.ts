@@ -7,12 +7,29 @@ import { eq, desc } from 'drizzle-orm';
 
 /**
  * 1:1 문의 라우트 팩토리 함수
+ * @description 사용자의 고객 문의 사항을 접수하고, 관련 파일 첨부 및 채팅 세션 접근 권한 설정을 관리합니다.
+ * @param {Elysia} app - Elysia 애플리케이션 인스턴스
+ * @returns {Elysia} 문의 라우트 그룹이 추가된 인스턴스
  */
 export const createInquiryRoutes = (app: Elysia) => {
   return app.group('/inquiry', (group) =>
     group
       .use(authPlugin)
 
+      /**
+       * 1:1 문의 등록
+       * @description 문의 제목, 내용과 함께 채팅 세션 연동 여부 및 다중 첨부 파일을 처리합니다.
+       * 1. 문의 기본 정보를 DB에 저장합니다.
+       * 2. 첨부 파일이 있는 경우 Cloudinary에 업로드 후 URL을 DB에 기록합니다.
+       * 3. 'allow_chat_access'가 true인 경우, 관리자가 관련 채팅 로그를 열람할 수 있도록 설정됩니다.
+       *
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {Object} context.body - 문의 등록 데이터 (title, content, chat_session_id, allow_chat_access, attachments)
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @param {Object} context.set - 응답 상태 설정 객체
+       * @returns {Promise<{success: boolean, inquiryId: number}>} 생성된 문의 ID
+       */
       .post(
         '/',
         async ({ body, userId, set }) => {
@@ -63,6 +80,14 @@ export const createInquiryRoutes = (app: Elysia) => {
         },
       )
 
+      /**
+       * 사용자의 문의 내역 리스트 조회
+       * @description 본인이 작성한 모든 문의 내역을 최신순으로 가져옵니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<Array<Object>>} 문의 내역 목록
+       */
       .get(
         '/list',
         async ({ userId }) => {

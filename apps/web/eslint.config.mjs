@@ -3,14 +3,16 @@ import nextPlugin from '@next/eslint-plugin-next';
 import sonarjs from 'eslint-plugin-sonarjs';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
-export default tseslint.config(
+export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     plugins: {
       '@next/next': nextPlugin,
       'react-hooks': reactHooks,
+      'jsx-a11y': jsxA11y,
       sonarjs,
     },
     rules: {
@@ -22,6 +24,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       'react-hooks/exhaustive-deps': 'error',
+      'jsx-a11y/label-has-associated-control': [
+        'error',
+        {
+          labelComponents: ['Label'],
+          labelAttributes: ['htmlFor'],
+          controlComponents: ['Input', 'Textarea', 'Select', 'Checkbox'],
+          depth: 3,
+        },
+      ],
     },
   },
-);
+];

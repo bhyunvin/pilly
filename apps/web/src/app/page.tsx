@@ -7,8 +7,11 @@ import { Search, MessageCircle, ArrowRight, ShieldCheck, Zap } from 'lucide-reac
 import Link from 'next/link';
 
 /**
- * Pilly 메인 랜딩 페이지
- * 서비스의 주요 특징(AI 상담, 의약품 검색 등)을 소개하고 각 기능으로의 진입점을 제공합니다.
+ * Pilly 메인 랜딩 페이지 컴포넌트입니다.
+ * 서비스의 주요 특징(AI 상담, 의약품 검색, 개인화 관리 등)을 소개하고 각 기능으로의 진입점을 제공합니다.
+ *
+ * @description 로그인 여부에 따라 미들웨어에서 접근이 제한될 수 있습니다.
+ * @returns {JSX.Element} 메인 페이지 렌더링 결과
  */
 export default function Home() {
   const [mounted, setMounted] = useState(false);

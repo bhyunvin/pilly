@@ -5,7 +5,14 @@ import { Checkbox as CheckboxPrimitive } from '@base-ui/react/checkbox';
 import { cn } from '@/lib/utils';
 import { CheckIcon } from 'lucide-react';
 
-function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
+/**
+ * @description 사용자가 여러 옵션 중 하나 이상을 선택할 수 있게 하는 체크박스 컴포넌트입니다.
+ * 체크 상태에 따른 시각적 피드백과 접근성을 지원합니다.
+ *
+ * @param {CheckboxPrimitive.Root.Props} props - 체크박스 루트 속성
+ * @returns {JSX.Element} 체크 상태를 표시하는 아이콘이 포함된 체크박스 요소를 반환합니다.
+ */
+function Checkbox({ className, ...props }: Readonly<CheckboxPrimitive.Root.Props>) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"

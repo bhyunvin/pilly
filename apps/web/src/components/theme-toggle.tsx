@@ -6,6 +6,12 @@ import { useTheme } from 'next-themes';
 
 import { Button } from '@/components/ui/button';
 
+/**
+ * @description 다크 모드와 라이트 모드 간 테마를 전환하는 토글 버튼 컴포넌트입니다.
+ * 현재 테마 상태에 따라 해(Sun) 또는 달(Moon) 아이콘을 애니메이션과 함께 표시합니다.
+ *
+ * @returns {JSX.Element} 테마 전환 기능을 수행하는 아이콘 버튼을 반환합니다.
+ */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 

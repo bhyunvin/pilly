@@ -1,5 +1,11 @@
 import React from 'react';
 
+/**
+ * 개인정보 및 민감정보 처리방침 페이지 컴포넌트입니다.
+ * 서비스에서 수집하는 건강 관련 정보의 항목, 목적, 보유 기간 등을 사용자에게 안내합니다.
+ *
+ * @returns {JSX.Element} 개인정보 처리방침 페이지 렌더링 결과
+ */
 export default function PrivacyPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 md:p-12 prose dark:prose-invert">

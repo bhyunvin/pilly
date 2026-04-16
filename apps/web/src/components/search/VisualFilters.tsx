@@ -9,6 +9,10 @@ interface VisualFiltersProps {
   onSelectColor: (color: string) => void;
 }
 
+/**
+ * @description 의약품 검색 시 시각적 특성(모양) 옵션 목록입니다.
+ * 각 모양에 따른 CSS 클래스와 명칭을 정의합니다.
+ */
 const shapes = [
   { name: '원형', class: 'rounded-full w-12 h-12' },
   { name: '타원형', class: 'rounded-[100%] w-16 h-10' },
@@ -22,6 +26,10 @@ const shapes = [
   { name: '오각형', class: 'w-12 h-12 clip-path-polygon' }, // Custom clip path would be better but simplified for now
 ];
 
+/**
+ * @description 의약품 검색 시 시각적 특성(색상) 옵션 목록입니다.
+ * 각 색상의 헥사코드와 명칭을 정의합니다.
+ */
 const colors = [
   { name: '하양', hex: '#FFFFFF', border: true },
   { name: '노랑', hex: '#FFEB3B' },
@@ -36,12 +44,19 @@ const colors = [
   { name: '검정', hex: '#000000' },
 ];
 
+/**
+ * @description 의약품의 외형적 특징(모양 및 색상)을 선택하여 검색 필터를 적용하는 컴포넌트입니다.
+ * 사용자가 시각적으로 인식한 의약품 정보를 기반으로 검색 범위를 좁힐 때 사용됩니다.
+ *
+ * @param {VisualFiltersProps} props - 현재 선택된 모양/색상 값 및 변경 콜백 함수
+ * @returns {JSX.Element} 모양 및 색상 선택 버튼 목록이 포함된 필터 영역을 반환합니다.
+ */
 export function VisualFilters({
   selectedShape,
   selectedColor,
   onSelectShape,
   onSelectColor,
-}: VisualFiltersProps) {
+}: Readonly<VisualFiltersProps>) {
   return (
     <div className="space-y-6">
       <div>

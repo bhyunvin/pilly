@@ -19,8 +19,10 @@ const VisualFilters = dynamic(
 );
 
 /**
- * 의약품 통합 검색 페이지
- * 이름, 모양, 색상 등 다양한 필터를 조합하여 의약품 정보를 검색합니다.
+ * 의약품 통합 검색 페이지 컴포넌트입니다.
+ * 이름, 모양, 색상 등 다양한 필터를 조합하여 식약처 공공 데이터 기반의 의약품 정보를 검색합니다.
+ *
+ * @returns {JSX.Element} 의약품 검색 페이지 렌더링 결과
  */
 export default function SearchPage() {
   const [query, setQuery] = useState('');
@@ -33,11 +35,13 @@ export default function SearchPage() {
   const { apiFetch } = useApi();
 
   /**
-   * 설정된 검색 조건에 따라 의약품 검색을 실행합니다.
-   * @param e - 폼 제출 이벤트 (선택사항)
+   * 설정된 검색 조건(이름, 모양, 색상)에 따라 의약품 정보를 비동기로 검색합니다.
+   *
+   * @async
+   * @param {React.FormEvent} [e] - 폼 제출 이벤트 객체 (선택사항)
    */
   const handleSearch = useCallback(
-    async (e?: React.FormEvent) => {
+    async (e?: React.SyntheticEvent) => {
       e?.preventDefault();
       if (!query && !selectedShape && !selectedColor) return;
 
@@ -76,7 +80,9 @@ export default function SearchPage() {
   }, [selectedShape, selectedColor, handleSearch]);
 
   /**
-   * 검색 결과 목록 또는 상태 안내 렌더링
+   * 로딩 상태, 에러 발생 여부 또는 검색 결과 목록을 적절한 UI로 렌더링합니다.
+   *
+   * @returns {JSX.Element} 현재 상태에 따른 검색 결과 렌더링 결과
    */
   const renderSearchResults = () => {
     if (isLoading) {

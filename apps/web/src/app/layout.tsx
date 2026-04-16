@@ -13,12 +13,19 @@ const geist = Geist({
   display: 'swap',
 });
 
+/**
+ * 애플리케이션의 뷰포트 설정입니다.
+ */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: '#ffffff',
 };
 
+/**
+ * 애플리케이션의 메타데이터 설정입니다.
+ * SEO 및 소셜 공유(Open Graph, Twitter) 정보를 포함합니다.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://pilly-web.vercel.app'),
   title: {
@@ -97,7 +104,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * 애플리케이션의 루트 레이아웃 컴포넌트입니다.
+ * 폰트, 테마, 글로벌 셸, 분석 도구 등을 설정합니다.
+ *
+ * @param {Object} props - 컴포넌트 프롭스
+ * @param {React.ReactNode} props.children - 하위 페이지 컴포넌트
+ */
+export default function RootLayout({ children }: { readonly children: React.ReactNode }) {
   return (
     <html lang="ko" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
       <head>

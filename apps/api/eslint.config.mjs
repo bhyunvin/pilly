@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 
-export default tseslint.config(
+export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -16,4 +16,4 @@ export default tseslint.config(
       'sonarjs/cognitive-complexity': ['error', 15],
     },
   },
-);
+];

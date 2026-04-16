@@ -1,5 +1,11 @@
 import React from 'react';
 
+/**
+ * 서비스 이용약관 페이지 컴포넌트입니다.
+ * 서비스의 목적, 의료 정보 제공의 한계, 이용자의 의무 등 법적 고지 사항을 안내합니다.
+ *
+ * @returns {JSX.Element} 이용약관 페이지 렌더링 결과
+ */
 export default function TermsPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 md:p-12 prose dark:prose-invert">

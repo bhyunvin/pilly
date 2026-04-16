@@ -18,8 +18,10 @@ import {
 import { MessageSquare, CheckCircle2, Loader2 } from 'lucide-react';
 
 /**
- * 1:1 문의 페이지 컴포넌트
- * 사용자가 서비스 이용 관련 문의사항을 작성하고 제출할 수 있는 기능을 제공함
+ * 1:1 문의 페이지 컴포넌트입니다.
+ * 사용자가 서비스 이용 관련 문의사항을 작성하고 관리자에게 제출할 수 있는 기능을 제공합니다.
+ *
+ * @returns {JSX.Element} 1:1 문의 페이지 렌더링 결과
  */
 export default function InquiryPage() {
   const { apiFetch } = useApi();
@@ -31,10 +33,12 @@ export default function InquiryPage() {
   const [error, setError] = useState('');
 
   /**
-   * 문의사항을 서버로 제출함
-   * @param e - 폼 제출 이벤트
+   * 작성된 문의사항을 서버로 비동기 제출합니다.
+   *
+   * @async
+   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
    */
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
@@ -128,7 +132,7 @@ export default function InquiryPage() {
               <Checkbox
                 id="allowAccess"
                 checked={allowChatAccess}
-                onCheckedChange={(checked) => setAllowChatAccess(checked as boolean)}
+                onCheckedChange={(checked) => setAllowChatAccess(checked === true)}
               />
               <div className="grid gap-1.5 leading-none">
                 <label

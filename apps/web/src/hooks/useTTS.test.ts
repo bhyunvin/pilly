@@ -2,6 +2,10 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useTTS } from './useTTS';
 
+/**
+ * @description useTTS 커스텀 훅의 개별 기능(음성 출력, 중단, 초기 상태 등)을 검증하는 단위 테스트 스위트입니다.
+ * 브라우저의 SpeechSynthesis API 모킹을 통해 훅의 동작을 테스트합니다.
+ */
 describe('useTTS Hook Unit Test', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,7 +27,7 @@ describe('useTTS Hook Unit Test', () => {
     });
 
     // setup.tsx의 mock을 확인
-    expect(window.speechSynthesis.speak).toHaveBeenCalled();
+    expect(globalThis.speechSynthesis.speak).toHaveBeenCalled();
   });
 
   it('stopSpeaking 호출 시 speechSynthesis.cancel이 호출되는가?', () => {
@@ -33,6 +37,6 @@ describe('useTTS Hook Unit Test', () => {
       result.current.stopSpeaking();
     });
 
-    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+    expect(globalThis.speechSynthesis.cancel).toHaveBeenCalled();
   });
 });

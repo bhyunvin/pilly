@@ -1,3 +1,8 @@
+/**
+ * @file 스키마 정의 파일
+ * @description Pilly 프로젝트의 PostgreSQL 데이터베이스 테이블 및 관계를 정의합니다.
+ */
+
 import {
   pgTable,
   serial,
@@ -13,13 +18,18 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
+/** 복약 상태를 나타내는 열거형 타입 */
 export const medicationStatusEnum = pgEnum('medication_status', [
   'PENDING',
   'COMPLETED',
   'SKIPPED',
 ]);
+/** 1:1 문의 상태를 나타내는 열거형 타입 */
 export const inquiryStatusEnum = pgEnum('inquiry_status', ['PENDING', 'RESOLVED']);
 
+/**
+ * 사용자가 등록한 복약 정보 테이블입니다.
+ */
 export const userMedications = pgTable(
   'user_medications',
   {
@@ -49,6 +59,9 @@ export const medicationHistory = pgTable(
   (table) => [index('medication_history_medication_id_idx').on(table.medicationId)],
 );
 
+/**
+ * 사용자와 AI 간의 채팅 세션 테이블입니다.
+ */
 export const chatSessions = pgTable(
   'chat_sessions',
   {
@@ -61,6 +74,13 @@ export const chatSessions = pgTable(
   (table) => [index('chat_sessions_user_id_idx').on(table.userId)],
 );
 
+/**
+ * AI 상담 로그 테이블입니다.
+ *
+ * @description
+ * 사용자의 질문(prompt)과 AI의 답변(response)을 세션별로 기록합니다.
+ * AI 상담 기능을 통해 도출된 데이터는 개인화된 서비스 제공의 기초가 됩니다.
+ */
 export const aiChatLogs = pgTable(
   'ai_chat_logs',
   {
@@ -88,6 +108,7 @@ export const aiChatLogsRelations = relations(aiChatLogs, ({ one }) => ({
   }),
 }));
 
+/** 사용자 활동 로그 테이블 */
 export const userActivityLogs = pgTable('user_activity_logs', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 }).notNull(),
@@ -96,6 +117,13 @@ export const userActivityLogs = pgTable('user_activity_logs', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+/**
+ * 의약품 식별 정보 카탈로그 테이블입니다.
+ *
+ * @description
+ * 공공 데이터를 통해 수집된 의약품의 명칭, 외형, 색상, 이미지 정보를 저장합니다.
+ * 사용자가 약물을 검색하거나 사진으로 식별할 때 이 데이터를 참조합니다.
+ */
 export const pillCatalog = pgTable(
   'pill_catalog',
   {
@@ -119,6 +147,7 @@ export const pillCatalog = pgTable(
   ],
 );
 
+/** 관리자의 채팅 접근 권한 승인 기록 테이블 */
 export const chatAccessApprovals = pgTable(
   'chat_access_approvals',
   {
@@ -137,6 +166,7 @@ export const chatAccessApprovals = pgTable(
   (table) => [index('chat_access_approvals_chat_session_id_idx').on(table.chatSessionId)],
 );
 
+/** 사용자의 1:1 문의 내역 테이블 */
 export const userInquiries = pgTable(
   'user_inquiries',
   {
@@ -157,6 +187,7 @@ export const userInquiries = pgTable(
   (table) => [index('user_inquiries_user_id_idx').on(table.userId)],
 );
 
+/** 문의 사항에 첨부된 파일 정보 테이블 */
 export const inquiryAttachments = pgTable(
   'inquiry_attachments',
   {
@@ -169,6 +200,13 @@ export const inquiryAttachments = pgTable(
   (table) => [index('inquiry_attachments_inquiry_id_idx').on(table.inquiryId)],
 );
 
+/**
+ * 사용자 프로필 및 계정 상태 테이블입니다.
+ *
+ * @description
+ * 사용자의 닉네임, 역할(USER/ADMIN), 계정 상태(ACTIVE/RESTRICTED) 등을 관리합니다.
+ * 계정 삭제 요청 시 `deletedAt` 컬럼에 일시가 기록되며 30일 후 스케줄러에 의해 실제 삭제됩니다.
+ */
 export const userProfiles = pgTable(
   'user_profiles',
   {
@@ -186,6 +224,7 @@ export const userProfiles = pgTable(
   (table) => [uniqueIndex('nickname_unique_idx').on(table.nickname)],
 );
 
+/** 사용자 이용 제한 내역 테이블 */
 export const userRestrictionHistory = pgTable('user_restriction_history', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 })

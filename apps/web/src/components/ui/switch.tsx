@@ -4,6 +4,13 @@ import { Switch as SwitchPrimitive } from '@base-ui/react/switch';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * @description 두 가지 상태(on/off) 간을 전환하는 스위치(토글) 컴포넌트입니다.
+ * 접근성을 지원하며, 크기 옵션(default, sm)과 커스텀 스타일링을 지원합니다.
+ *
+ * @param {SwitchPrimitive.Root.Props & { size?: 'sm' | 'default'; }} props - 스위치 속성 및 크기 옵션
+ * @returns {JSX.Element} 스위치 루트 및 썸(thumb)이 포함된 요소를 반환합니다.
+ */
 function Switch({
   className,
   size = 'default',

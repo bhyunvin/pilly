@@ -14,14 +14,19 @@ interface RestrictionInfo {
 }
 
 /**
- * 이용 제한 안내 페이지
- * 계정이 정지되거나 제재를 받은 사용자가 서비스 접근 시 리다이렉트되어 제한 사유를 확인하는 페이지입니다.
+ * 이용 제한 안내 페이지 컴포넌트입니다.
+ * 운영 정책에 따라 서비스 이용이 제한된 사용자에게 제한 사유와 일시를 안내합니다.
+ *
+ * @returns {JSX.Element} 이용 제한 안내 페이지 렌더링 결과
  */
 export default function RestrictedPage() {
-  const [info, setRestrictionInfo] = useState<RestrictionInfo | null>(null);
+  const [restrictionInfo, setRestrictionInfo] = useState<RestrictionInfo | null>(null);
 
   /**
-   * 서버로부터 사용자의 현재 제재 정보를 조회합니다.
+   * 서버로부터 사용자의 현재 이용 제한 정보를 비동기로 조회합니다.
+   *
+   * @async
+   * @function fetchRestrictionInfo
    */
   const fetchRestrictionInfo = useCallback(async () => {
     try {
@@ -45,11 +50,14 @@ export default function RestrictedPage() {
   }, [fetchRestrictionInfo]);
 
   /**
-   * 로그아웃을 처리합니다.
+   * 로그아웃을 처리하고 로그인 페이지로 이동합니다.
+   *
+   * @async
+   * @function handleLogout
    */
   const handleLogout = async () => {
     await authClient.signOut();
-    window.location.href = '/login';
+    globalThis.location.href = '/login';
   };
 
   return (
@@ -73,16 +81,16 @@ export default function RestrictedPage() {
                 제한 사유
               </p>
               <p className="text-sm font-medium">
-                {info?.restrictedReason || '정책 위반 또는 비정상적인 활동 감지'}
+                {restrictionInfo?.restrictedReason || '정책 위반 또는 비정상적인 활동 감지'}
               </p>
             </div>
-            {info?.restrictedAt && (
+            {restrictionInfo?.restrictedAt && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   제한 일시
                 </p>
                 <p className="text-sm font-medium">
-                  {format(new Date(info.restrictedAt), 'yyyy년 MM월 dd일 HH:mm')}
+                  {format(new Date(restrictionInfo.restrictedAt), 'yyyy년 MM월 dd일 HH:mm')}
                 </p>
               </div>
             )}
@@ -92,7 +100,7 @@ export default function RestrictedPage() {
             <Button
               variant="outline"
               className="w-full gap-2"
-              onClick={() => (window.location.href = '/inquiry')}
+              onClick={() => (globalThis.location.href = '/inquiry')}
             >
               <MessageCircle size={18} />
               이의 제기 및 문의하기

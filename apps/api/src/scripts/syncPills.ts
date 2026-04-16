@@ -2,25 +2,54 @@ import { db } from '../db';
 import { pillCatalog } from '../db/schema';
 import { sql } from 'drizzle-orm';
 
+/**
+ * 공공 데이터 API에서 반환되는 개별 약물 항목의 구조입니다.
+ */
 interface PillItem {
+  /** 품목 일련번호 */
   ITEM_SEQ: string;
+  /** 품목명 */
   ITEM_NAME: string;
+  /** 업체명 */
   ENTP_NAME: string;
+  /** 성상 */
   CHART: string;
+  /** 의약품 모양 */
   DRUG_SHAPE: string;
+  /** 색상 (앞) */
   COLOR_CLASS1: string;
+  /** 색상 (뒤) */
   COLOR_CLASS2: string;
+  /** 분할선 (앞) */
   LINE_FRONT: string;
+  /** 분할선 (뒤) */
   LINE_BACK: string;
+  /** 품목 이미지 URL */
   ITEM_IMAGE: string;
 }
 
+/**
+ * 공공 데이터 API의 전체 응답 구조입니다.
+ */
 interface PillApiResponse {
   body?: {
     items?: PillItem[];
   };
 }
 
+/**
+ * 공공 데이터 포털의 의약품 개요 정보를 활용하여 데이터베이스를 업데이트합니다.
+ *
+ * @description
+ * 식품의약품안전처에서 제공하는 의약품 낱알 식별 정보를 페이징하여 가져온 뒤,
+ * 데이터베이스의 `pill_catalog` 테이블에 삽입하거나 업데이트(Upsert)합니다.
+ * 대량의 데이터를 처리하기 위해 페이지당 100개씩 배치 처리를 수행하며,
+ * API 서버의 부하를 줄이기 위해 각 요청 사이에 100ms의 지연 시간을 둡니다.
+ *
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} API 요청 실패 또는 DB 작업 중 오류 발생 시 에러를 던집니다.
+ */
 export async function updatePillDatabase() {
   console.log('💊 Starting Pill Database Sync...');
 

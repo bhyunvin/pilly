@@ -8,12 +8,20 @@ import { streamText } from 'ai';
 import { encrypt } from '../utils/security';
 
 /**
- * 채팅 히스토리 메시지 구조 정의
+ * 채팅 히스토리 메시지 텍스트 파트 구조
+ * @interface ChatHistoryPart
+ * @property {string} text - 실제 대화 내용
  */
 interface ChatHistoryPart {
   text: string;
 }
 
+/**
+ * 채팅 히스토리 메시지 항목 구조
+ * @interface ChatHistoryItem
+ * @property {string} role - 화자의 역할 (user 또는 assistant)
+ * @property {ChatHistoryPart[]} parts - 메시지 내용 파트 리스트
+ */
 interface ChatHistoryItem {
   role: string;
   parts: ChatHistoryPart[];
@@ -21,17 +29,23 @@ interface ChatHistoryItem {
 
 /**
  * AI 복약 상담 관련 API 라우트를 정의하는 그룹
- * 세션 관리 및 LLM 기반의 실시간 스트리밍 채팅 기능을 제공합니다.
+ * @description 세션 관리 및 LLM 기반의 실시간 스트리밍 채팅 기능을 제공합니다.
+ * 보안을 위해 대화 내역은 암호화되어 저장됩니다.
  *
- * @param app - Elysia 애플리케이션 인스턴스
- * @returns 채팅 그룹 라우트가 추가된 인스턴스
+ * @param {Elysia} app - Elysia 애플리케이션 인스턴스
+ * @returns {Elysia} 채팅 그룹 라우트가 추가된 인스턴스
  */
 export const createChatRoutes = (app: Elysia) => {
   return app.group('/chat', (group) =>
     group
       .use(authPlugin)
       /**
-       * 사용자의 활성화된 모든 채팅 세션 목록을 최신순으로 조회합니다.
+       * 사용자의 활성화된 모든 채팅 세션 목록 조회
+       * @description 현재 로그인한 사용자의 모든 과거 상담 내역 세션을 최신순으로 가져옵니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<Array<Object>>} 채팅 세션 리스트
        */
       .get(
         '/sessions',
@@ -52,7 +66,13 @@ export const createChatRoutes = (app: Elysia) => {
       )
 
       /**
-       * 새로운 채팅 상담 세션을 생성합니다.
+       * 새로운 채팅 상담 세션 생성
+       * @description AI와의 대화를 시작하기 위한 새로운 방(세션)을 생성합니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @param {Object} context.body - 요청 본문 (title)
+       * @returns {Promise<{success: boolean, data: Object}>} 생성된 세션 정보
        */
       .post(
         '/sessions',
@@ -80,8 +100,18 @@ export const createChatRoutes = (app: Elysia) => {
       )
 
       /**
-       * 특정 세션 내에서 AI에게 메시지를 전송하고 스트리밍 답변을 받습니다.
-       * 답변 완료 후 해당 로그는 DB에 영구 저장됩니다.
+       * 실시간 AI 메시징 및 스트리밍 응답
+       * @description 특정 세션 내에서 AI에게 메시지를 전송하고 Gemini AI로부터 실시간 스트리밍 답변을 받습니다.
+       * 1. 사용자 질문을 암호화하여 즉시 DB에 기록 (유실 방지)
+       * 2. Gemini 1.5 Flash 모델을 통한 전문 복약 지도 답변 생성
+       * 3. 답변 완료 후 암호화된 응답을 DB에 업데이트
+       *
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {Object} context.params - 경로 파라미터 (id)
+       * @param {Object} context.body - 요청 본문 (history)
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<Response>} AI 응답 스트림
        */
       .post(
         '/sessions/:id/message',

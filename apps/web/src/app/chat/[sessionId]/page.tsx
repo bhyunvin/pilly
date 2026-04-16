@@ -56,6 +56,17 @@ interface AnalyzedMed {
   checked?: boolean;
 }
 
+/**
+ * 개별 채팅 세션 내에서 AI와 대화를 주고받는 페이지 컴포넌트입니다.
+ *
+ * @description
+ * 사용자의 질문에 대해 Gemini AI 모델이 실시간 스트리밍 방식으로 답변을 생성합니다.
+ * 이전 대화 내역을 불러오고, 새로운 메시지를 전송하며, 필요에 따라
+ * 음성 합성(TTS) 기능을 통해 답변을 읽어줍니다. 또한 약물 사진 분석 기능을 통해
+ * 처방전이나 약봉투 이미지를 분석하여 복약 정보를 자동으로 등록할 수 있습니다.
+ *
+ * @returns {JSX.Element} 채팅 세션 페이지 UI
+ */
 export default function ChatSessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -79,6 +90,12 @@ export default function ChatSessionPage() {
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
   const [analyzedMeds, setAnalyzedMeds] = useState<AnalyzedMed[]>([]);
 
+  /**
+   * 해당 세션의 과거 대화 내역을 서버로부터 불러옵니다.
+   *
+   * @async
+   * @callback
+   */
   const fetchHistory = useCallback(async () => {
     try {
       const res = await apiFetch(`/chat/sessions/${sessionId}`);
@@ -94,8 +111,10 @@ export default function ChatSessionPage() {
         });
       } else {
         result.logs.forEach((log) => {
-          history.push({ role: 'user', content: log.prompt });
-          history.push({ role: 'ai', content: log.response });
+          history.push(
+            { role: 'user', content: log.prompt },
+            { role: 'ai', content: log.response },
+          );
         });
       }
       setMessages(history);
@@ -111,8 +130,8 @@ export default function ChatSessionPage() {
   }, [fetchHistory]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      synth.current = window.speechSynthesis;
+    if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
+      synth.current = globalThis.speechSynthesis;
       setTtsSupported(true);
     }
   }, []);
@@ -123,20 +142,34 @@ export default function ChatSessionPage() {
     }
   }, [messages]);
 
+  /**
+   * 음성 안내(TTS) 기능의 사용 여부를 토글합니다.
+   */
   const toggleTts = () => {
     if (ttsEnabled) synth.current?.cancel();
     setTtsEnabled(!ttsEnabled);
   };
 
+  /**
+   * 주어진 텍스트를 한국어 음성으로 출력합니다.
+   *
+   * @param {string} text - 음성으로 출력할 텍스트
+   */
   const speak = (text: string) => {
     if (!ttsEnabled || !synth.current) return;
     synth.current.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.replace(/[#*`]/g, ''));
+    const utterance = new SpeechSynthesisUtterance(text.replaceAll(/[#*`]/g, ''));
     utterance.lang = 'ko-KR';
     synth.current.speak(utterance);
   };
 
-  const handleSend = async (e: React.FormEvent) => {
+  /**
+   * 사용자 메시지를 서버로 전송하고 AI의 답변을 스트리밍 방식으로 수신합니다.
+   *
+   * @async
+   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
+   */
+  const handleSend = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
@@ -174,7 +207,8 @@ export default function ChatSessionPage() {
           fullResponse += chunk;
           setMessages((prev) => {
             const updated = [...prev];
-            updated[updated.length - 1].content += chunk;
+            const last = updated.at(-1);
+            if (last) last.content += chunk;
             return updated;
           });
         }
@@ -184,7 +218,8 @@ export default function ChatSessionPage() {
       console.error('Chat send error:', err);
       setMessages((prev) => {
         const updated = [...prev];
-        updated[updated.length - 1].content = '네트워크 연결 상태를 확인해 주세요.';
+        const last = updated.at(-1);
+        if (last) last.content = '네트워크 연결 상태를 확인해 주세요.';
         return updated;
       });
     } finally {
@@ -192,6 +227,12 @@ export default function ChatSessionPage() {
     }
   };
 
+  /**
+   * 업로드된 사진(처방전 등)을 AI Vision API를 통해 분석 요청합니다.
+   *
+   * @async
+   * @param {React.ChangeEvent<HTMLInputElement>} e - 파일 입력 변경 이벤트 객체
+   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -221,6 +262,11 @@ export default function ChatSessionPage() {
     }
   };
 
+  /**
+   * 분석된 약물 목록 중 사용자가 선택한 항목들을 실제 복약 목록에 추가합니다.
+   *
+   * @async
+   */
   const handleVisionConfirm = async () => {
     const medsToAdd = analyzedMeds.filter((m) => m.checked);
     if (medsToAdd.length === 0) return setIsVisionModalOpen(false);
@@ -239,7 +285,7 @@ export default function ChatSessionPage() {
           }),
         });
       }
-      handleSend({ preventDefault: () => {} } as React.FormEvent);
+      handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
     } catch (err) {
       console.error('Vision confirm error:', err);
       alert('약물 추가 중 오류가 발생했습니다.');
@@ -248,6 +294,12 @@ export default function ChatSessionPage() {
     }
   };
 
+  /**
+   * 메시지 내용을 렌더링합니다. AI 답변인 경우 마크다운 형식을 파싱합니다.
+   *
+   * @param {Message} msg - 렌더링할 메시지 객체
+   * @returns {JSX.Element | string} 렌더링된 메시지 내용
+   */
   const renderContent = (msg: Message) => {
     if (msg.role === 'ai') {
       const html = DOMPurify.sanitize(marked.parse(msg.content) as string);
@@ -338,7 +390,7 @@ export default function ChatSessionPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4" aria-live="polite">
           {messages.map((msg, idx) => (
             <div
-              key={idx}
+              key={`${msg.role}-${idx}`}
               className={cn(
                 'flex items-start gap-3 max-w-[85%]',
                 msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',

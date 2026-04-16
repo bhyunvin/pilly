@@ -38,6 +38,13 @@ interface UserDetailSheetProps {
   activateUser: (userId: string) => void;
 }
 
+/**
+ * @description 관리자 페이지에서 특정 사용자의 상세 정보 조회 및 관리 기능을 제공하는 시트 컴포넌트입니다.
+ * 사용자의 역할(ADMIN/USER) 변경, 이용 제한 상태 설정 및 해제, 제재 히스토리 타임라인 조회 기능을 포함합니다.
+ *
+ * @param {UserDetailSheetProps} props - 선택된 사용자 정보, 제재 사유 상태 및 관리 액션 함수들
+ * @returns {JSX.Element | null} 사용자가 선택된 경우 상세 관리 시트를 반환하며, 그렇지 않으면 null을 반환합니다.
+ */
 export function UserDetailSheet({
   selectedUser,
   restrictionReason,
@@ -45,7 +52,7 @@ export function UserDetailSheet({
   toggleRole,
   restrictUser,
   activateUser,
-}: UserDetailSheetProps) {
+}: Readonly<UserDetailSheetProps>) {
   if (!selectedUser) return null;
 
   return (

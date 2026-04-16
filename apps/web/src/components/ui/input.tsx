@@ -3,6 +3,13 @@ import { Input as InputPrimitive } from '@base-ui/react/input';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * @description 한 줄 텍스트나 데이터를 입력받기 위한 기본 폼 요소입니다.
+ * 다양한 input 타입(text, password, email 등)을 지원하며, 포커스 및 유효성 검사 실패 시의 시각적 스타일을 제공합니다.
+ *
+ * @param {React.ComponentProps<'input'>} props - input 요소의 모든 표준 속성
+ * @returns {JSX.Element} 스타일이 적용된 input 요소를 반환합니다.
+ */
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   return (
     <InputPrimitive

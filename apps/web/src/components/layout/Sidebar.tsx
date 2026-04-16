@@ -27,6 +27,13 @@ interface ChatSession {
   createdAt: string;
 }
 
+/**
+ * @description 데스크톱 환경에서 화면 왼쪽에 고정되는 사이드바 내비게이션 컴포넌트입니다.
+ * 주요 서비스 메뉴 이동, 최근 채팅 세션 목록 조회 및 관리(제목 수정),
+ * 관리자 계정의 경우 관리자 전용 메뉴(사용자 관리 등) 노출 기능을 수행합니다.
+ *
+ * @returns {JSX.Element} 서비스 내비게이션 및 세션 목록을 포함한 사이드바를 반환합니다.
+ */
 export function Sidebar() {
   const pathname = usePathname();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -41,6 +48,10 @@ export function Sidebar() {
     { label: '내 프로필', icon: User, href: '/profile' },
   ];
 
+  /**
+   * @description 현재 로그인한 사용자의 프로필 정보를 조회하여 관리자 권한 여부를 확인합니다.
+   * @async
+   */
   const fetchProfile = async () => {
     try {
       const { data: sessionData } = await authClient.getSession();
@@ -63,6 +74,10 @@ export function Sidebar() {
     }
   };
 
+  /**
+   * @description 최근 생성된 채팅 세션 목록을 API를 통해 조회합니다.
+   * @async
+   */
   const fetchSessions = async () => {
     try {
       const { data: sessionData } = await authClient.getSession();
@@ -91,11 +106,20 @@ export function Sidebar() {
     return () => globalThis.removeEventListener('refresh-sessions', fetchSessions);
   }, []);
 
+  /**
+   * @description 특정 채팅 세션의 제목 수정을 시작합니다.
+   * @param {ChatSession} session - 수정할 세션 객체
+   */
   const handleStartEdit = (session: ChatSession) => {
     setEditingId(session.id);
     setEditTitle(session.title);
   };
 
+  /**
+   * @description 수정된 세션 제목을 API를 통해 저장합니다. 낙관적 업데이트를 적용합니다.
+   * @async
+   * @param {number} id - 수정할 세션의 ID
+   */
   const handleSaveEdit = async (id: number) => {
     if (!editTitle.trim()) return;
 

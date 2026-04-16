@@ -14,6 +14,12 @@ interface ChatLog {
   createdAt: string;
 }
 
+/**
+ * 관리자용 채팅 내역 열람 페이지 컴포넌트입니다.
+ * 1:1 문의 대응을 위해 사용자 동의를 얻은 한시적 접근 권한(UUID)을 통해 대화 로그를 조회합니다.
+ *
+ * @returns {JSX.Element} 관리자용 채팅 로그 열람 페이지 렌더링 결과
+ */
 export default function AdminChatViewPage() {
   const params = useParams();
   const uuid = params.uuid as string;
@@ -22,6 +28,12 @@ export default function AdminChatViewPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    /**
+     * UUID를 사용하여 특정 사용자의 채팅 로그를 서버로부터 비동기로 가져옵니다.
+     *
+     * @async
+     * @function fetchChatLogs
+     */
     const fetchChatLogs = async () => {
       try {
         const { data: sessionData } = await authClient.getSession();

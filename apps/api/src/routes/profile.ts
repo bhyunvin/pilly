@@ -6,14 +6,24 @@ import { eq } from 'drizzle-orm';
 
 /**
  * 사용자 프로필 라우트 팩토리 함수
- * @param app Elysia 인스턴스
- * @returns 리팩토링된 프로필 라우트가 포함된 Elysia 인스턴스
+ * @description 내 정보 조회, 닉네임 변경, 회원 탈퇴 및 계정 복구 기능을 제공합니다.
+ * @param {Elysia} app - Elysia 애플리케이션 인스턴스
+ * @returns {Elysia} 프로필 라우트 그룹이 추가된 인스턴스
  */
 export const createProfileRoutes = (app: Elysia) => {
   return app.group('/profile', (group) =>
     group
       .use(authMiddleware)
 
+      /**
+       * 내 프로필 정보 조회
+       * @description 현재 로그인한 사용자의 닉네임, 역할, 가입일 등 상세 정보를 조회합니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @param {Object} context.set - 응답 상태 설정 객체
+       * @returns {Promise<{success: boolean, data: Object} | {success: false, message: string}>} 사용자 프로필 데이터
+       */
       .get(
         '/',
         async ({ userId, set }) => {
@@ -37,6 +47,15 @@ export const createProfileRoutes = (app: Elysia) => {
         },
       )
 
+      /**
+       * 닉네임 수정
+       * @description 사용자의 서비스 내 닉네임을 변경합니다. (2~40자 제한)
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {Object} context.body - 요청 본문 (nickname)
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<{success: boolean, data: Object}>} 업데이트된 프로필 정보
+       */
       .patch(
         '/',
         async ({ body, userId }) => {
@@ -60,6 +79,16 @@ export const createProfileRoutes = (app: Elysia) => {
         },
       )
 
+      /**
+       * 회원 탈퇴 (Soft Delete)
+       * @description 계정을 즉시 삭제하지 않고 30일간의 유예 기간을 두는 Soft-delete를 수행합니다.
+       * 유예 기간 동안 사용자는 다시 로그인하여 탈퇴를 철회할 수 있습니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {Object} context.body - 요청 본문 (reason)
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<{success: boolean, message: string}>} 처리 결과 메시지
+       */
       .post(
         '/withdraw',
         async ({ body, userId }) => {
@@ -91,6 +120,14 @@ export const createProfileRoutes = (app: Elysia) => {
         },
       )
 
+      /**
+       * 탈퇴 계정 복구
+       * @description 탈퇴 유예 기간(30일) 중인 계정을 다시 활성 상태로 복구합니다.
+       * @async
+       * @param {Object} context - 요청 컨텍스트
+       * @param {string} context.userId - 인증된 사용자 ID
+       * @returns {Promise<{success: boolean, message: string}>} 복구 결과 메시지
+       */
       .post(
         '/restore',
         async ({ userId }) => {

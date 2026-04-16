@@ -16,8 +16,10 @@ interface Medication {
 }
 
 /**
- * 사용자별 복약 정보 관리 페이지
- * 복용 중인 약물을 조회하고, 새로운 약물을 추가하거나 삭제할 수 있는 기능을 제공합니다.
+ * 사용자별 복약 정보 관리 페이지 컴포넌트입니다.
+ * 현재 복용 중인 약물 목록을 조회하고, 새로운 약물 추가 및 기존 정보 삭제 기능을 제공합니다.
+ *
+ * @returns {JSX.Element} 복약 정보 관리 페이지 렌더링 결과
  */
 export default function MedicationsPage() {
   const [medications, setMedications] = useState<Medication[]>([]);
@@ -27,7 +29,10 @@ export default function MedicationsPage() {
   const { apiFetch } = useApi();
 
   /**
-   * 서버로부터 복약 목록을 가져옵니다.
+   * 서버로부터 사용자의 복약 목록을 비동기로 가져옵니다.
+   *
+   * @async
+   * @function fetchMedications
    */
   const fetchMedications = useCallback(async () => {
     try {
@@ -49,10 +54,12 @@ export default function MedicationsPage() {
   }, [fetchMedications]);
 
   /**
-   * 새로운 복약 정보를 추가합니다.
-   * @param e - 폼 제출 이벤트
+   * 사용자가 입력한 새로운 복약 정보를 서버에 비동기로 추가합니다.
+   *
+   * @async
+   * @param {React.SyntheticEvent} e - 폼 제출 이벤트 객체
    */
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newMed.name) return;
 
@@ -75,8 +82,10 @@ export default function MedicationsPage() {
   };
 
   /**
-   * 특정 복약 정보를 삭제합니다.
-   * @param id - 삭제할 복약 정보의 고유 ID
+   * 특정 복약 정보를 서버에서 비동기로 삭제합니다.
+   *
+   * @async
+   * @param {string} id - 삭제할 복약 정보의 고유 ID
    */
   const handleDelete = async (id: string) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
@@ -95,7 +104,9 @@ export default function MedicationsPage() {
   };
 
   /**
-   * 로딩 상태 및 빈 목록 상태에 따른 컨텐츠 렌더링
+   * 로딩 상태 및 데이터 유무에 따라 적절한 UI 컨텐츠를 렌더링합니다.
+   *
+   * @returns {JSX.Element} 현재 상태에 따른 렌더링 결과
    */
   const renderContent = () => {
     if (isFetching) {

@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * 애플리케이션의 미들웨어 함수입니다.
+ * 세션 토큰을 확인하여 보호된 경로에 대한 접근 권한을 제어합니다.
+ *
+ * @param {NextRequest} request - Next.js 요청 객체
+ * @returns {NextResponse} 다음 미들웨어로 진행하거나 리다이렉트 응답을 반환합니다.
+ */
 export function middleware(request: NextRequest) {
   // Better Auth는 기본적으로 'better-auth.session_token' 쿠키를 사용함
   const sessionToken = request.cookies.get('better-auth.session_token');
@@ -24,7 +31,10 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// 미들웨어가 실행될 경로 설정 (정적 파일 및 API 제외)
+/**
+ * 미들웨어가 실행될 경로 설정입니다.
+ * API, 정적 파일, 이미지 최적화 파일, 파비콘 등을 제외한 모든 경로에서 실행됩니다.
+ */
 export const config = {
   matcher: [
     /*
