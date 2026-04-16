@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { logger } from '@/utils/logger';
 import { useApi } from '@/hooks/useApi';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth';
@@ -46,7 +47,7 @@ export default function RestorePage() {
 
       setDeletedAt(result.data.deletedAt);
     } catch (err) {
-      console.error('프로필 로드 중 오류 발생:', err);
+      logger.error({ err }, '프로필 로드 중 오류 발생');
       // 인증 실패 등의 경우 로그인 페이지로 이동할 수 있음
     } finally {
       setIsLoading(false);
@@ -79,7 +80,7 @@ export default function RestorePage() {
 
       alert('복구 처리 중 오류가 발생했습니다.');
     } catch (err) {
-      console.error('계정 복구 중 오류 발생:', err);
+      logger.error({ err }, '계정 복구 중 오류 발생');
       alert('네트워크 오류가 발생했습니다.');
     } finally {
       setIsRestoring(false);

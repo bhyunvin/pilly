@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import Image from 'next/image';
 import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,7 +65,7 @@ export default function SearchPage() {
           }
         }
       } catch (err) {
-        console.error('Search failed:', err);
+        logger.error({ err }, 'Search failed');
         setError('검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
         setIsLoading(false);

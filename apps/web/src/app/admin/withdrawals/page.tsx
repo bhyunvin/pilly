@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
 import {
   Table,
@@ -53,7 +54,7 @@ export default function AdminWithdrawalsPage() {
           setWithdrawals(result.data);
         }
       } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Admin withdrawals fetch error');
       } finally {
         setIsLoading(false);
       }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,7 +74,7 @@ export function ChatInquiryModal({
       setInquiryContent('');
       setInquiryAttachment([]);
     } catch (err) {
-      console.error('Inquiry submit error:', err);
+      logger.error({ err }, 'Inquiry submit error');
       alert('문의 등록 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);

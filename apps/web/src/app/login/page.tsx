@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +66,7 @@ export default function LoginPage() {
         setMessage('이메일로 전송된 링크를 확인해 주세요.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error({ err }, 'Login request error');
       setMessage('네트워크 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);

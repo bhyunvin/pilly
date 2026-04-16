@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 import Link from 'next/link';
 import {
   Home,
@@ -70,7 +71,7 @@ export function Sidebar() {
         setIsAdmin(result.data.role === 'ADMIN');
       }
     } catch (err) {
-      console.error(err);
+      logger.error({ err }, 'Error fetching profile');
     }
   };
 
@@ -94,7 +95,7 @@ export function Sidebar() {
         setSessions(data);
       }
     } catch (err) {
-      console.error(err);
+      logger.error({ err }, 'Error fetching sessions');
     }
   };
 
@@ -142,7 +143,7 @@ export function Sidebar() {
       );
       if (!res.ok) throw new Error('수정 실패');
     } catch (err) {
-      console.error('Failed to update session title:', err);
+      logger.error({ err }, 'Failed to update session title:');
       setSessions(oldSessions);
       alert('제목 수정 중 오류가 발생했습니다.');
     }

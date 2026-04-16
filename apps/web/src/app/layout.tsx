@@ -4,6 +4,7 @@ import { Geist } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AppShell } from '@/components/layout/AppShell';
+import { ErrorProvider } from '@/components/providers/ErrorProvider';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -135,7 +136,9 @@ export default function RootLayout({ children }: { readonly children: React.Reac
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>{children}</AppShell>
+          <ErrorProvider>
+            <AppShell>{children}</AppShell>
+          </ErrorProvider>
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />

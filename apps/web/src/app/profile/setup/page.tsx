@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,7 @@ export default function ProfileSetupPage() {
       // 3. 성공 시 홈으로 리다이렉트
       router.push('/');
     } catch (err) {
-      console.error(err);
+      logger.error({ err }, 'Profile setup error');
       setError('서버와의 통신 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);

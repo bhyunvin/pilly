@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -62,7 +63,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
           }
         }
       } catch (err) {
-        console.error('Restriction/Withdrawal check failed:', err);
+        logger.error({ err }, 'Restriction/Withdrawal check failed');
       }
     };
 

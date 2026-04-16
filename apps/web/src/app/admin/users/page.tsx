@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useApi } from '@/hooks/useApi';
 import {
   Table,
@@ -72,7 +73,7 @@ export default function AdminUsersPage() {
         setUsers(userListResponse.users);
       }
     } catch (err) {
-      console.error('Admin fetch users error:', err);
+      logger.error({ err }, 'Admin fetch users error');
       alert('사용자 목록을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
@@ -94,7 +95,7 @@ export default function AdminUsersPage() {
         setIsDetailOpen(true);
       }
     } catch (err) {
-      console.error('Admin fetch user details error:', err);
+      logger.error({ err }, 'Admin fetch user details error');
     }
   };
 
@@ -119,7 +120,7 @@ export default function AdminUsersPage() {
         }
       }
     } catch (err) {
-      console.error('Admin toggle role error:', err);
+      logger.error({ err }, 'Admin toggle role error');
       alert('권한 변경 중 오류가 발생했습니다.');
     }
   };
@@ -146,7 +147,7 @@ export default function AdminUsersPage() {
         setRestrictionReason('');
       }
     } catch (err) {
-      console.error('Admin restrict user error:', err);
+      logger.error({ err }, 'Admin restrict user error');
     }
   };
 
@@ -171,7 +172,7 @@ export default function AdminUsersPage() {
         setRestrictionReason('');
       }
     } catch (err) {
-      console.error('Admin activate user error:', err);
+      logger.error({ err }, 'Admin activate user error');
     }
   };
 

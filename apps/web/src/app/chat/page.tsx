@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ export default function ChatSessionsPage() {
       const result = await res.json();
       setSessions(result);
     } catch (err) {
-      console.error('상담 내역 로드 중 오류 발생:', err);
+      logger.error({ err }, '상담 내역 로드 중 오류 발생');
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +77,7 @@ export default function ChatSessionsPage() {
         router.push(`/chat/${result.data.id}`);
       }
     } catch (err) {
-      console.error('세션 생성 중 오류 발생:', err);
+      logger.error({ err }, '세션 생성 중 오류 발생');
       setIsCreating(false);
     }
   };

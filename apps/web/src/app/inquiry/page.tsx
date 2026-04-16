@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +65,7 @@ export default function InquiryPage() {
       setContent('');
       setAllowChatAccess(false);
     } catch (err) {
-      console.error('문의 제출 중 오류 발생:', err);
+      logger.error({ err }, '문의 제출 중 오류 발생');
       setError('서버와의 통신 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);

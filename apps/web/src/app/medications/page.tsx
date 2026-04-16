@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +44,7 @@ export default function MedicationsPage() {
         setMedications(data.medications);
       }
     } catch (err) {
-      console.error('Failed to fetch medications:', err);
+      logger.error({ err }, 'Failed to fetch medications');
     } finally {
       setIsFetching(false);
     }
@@ -75,7 +76,7 @@ export default function MedicationsPage() {
         setNewMed({ name: '', dosage: '', frequency: '' });
       }
     } catch (err) {
-      console.error('Failed to add medication:', err);
+      logger.error({ err }, 'Failed to add medication');
     } finally {
       setIsSubmitting(false);
     }
@@ -99,7 +100,7 @@ export default function MedicationsPage() {
         setMedications((prev) => prev.filter((m) => m.id !== id));
       }
     } catch (err) {
-      console.error('Failed to delete medication:', err);
+      logger.error({ err }, 'Failed to delete medication');
     }
   };
 

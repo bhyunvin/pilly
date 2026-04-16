@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { logger } from '@/utils/logger';
 import { useParams } from 'next/navigation';
 import { authClient } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,7 +59,7 @@ export default function AdminChatViewPage() {
         const result = await response.json();
         setLogs(result.data);
       } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Admin chat logs fetch error');
         setError('서버와의 통신 중 오류가 발생했습니다.');
       } finally {
         setIsLoading(false);

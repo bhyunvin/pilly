@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from '@/utils/logger';
 
 /**
  * @description 텍스트에서 마크다운 링크 형식을 제거하고 텍스트 본문만 추출하는 헬퍼 함수입니다.
@@ -194,7 +195,7 @@ export const useTTS = () => {
         };
 
         utterance.onerror = (event) => {
-          console.error('TTS Error:', event);
+          logger.error({ err: event }, 'TTS Error:');
           setIsSpeaking(false);
         };
 

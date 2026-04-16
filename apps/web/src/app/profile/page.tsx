@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth';
 import { useApi } from '@/hooks/useApi';
@@ -69,7 +70,7 @@ export default function ProfilePage() {
         setNickname(result.data.nickname);
       }
     } catch (err) {
-      console.error('Profile fetch error:', err);
+      logger.error({ err }, 'Profile fetch error');
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +104,7 @@ export default function ProfilePage() {
         setMessage({ text: result.message || '수정 실패', type: 'error' });
       }
     } catch (err) {
-      console.error('Nickname update error:', err);
+      logger.error({ err }, 'Nickname update error');
       setMessage({ text: '오류가 발생했습니다.', type: 'error' });
     } finally {
       setIsSaving(false);
@@ -134,7 +135,7 @@ export default function ProfilePage() {
         alert('탈퇴 처리 중 오류가 발생했습니다.');
       }
     } catch (err) {
-      console.error('Withdraw error:', err);
+      logger.error({ err }, 'Withdraw error');
       alert('네트워크 오류가 발생했습니다.');
     } finally {
       setIsWithdrawing(false);

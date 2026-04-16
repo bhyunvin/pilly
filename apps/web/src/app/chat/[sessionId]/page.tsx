@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { useParams, useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
 import { Input } from '@/components/ui/input';
@@ -119,7 +120,7 @@ export default function ChatSessionPage() {
       }
       setMessages(history);
     } catch (err) {
-      console.error('Chat history fetch error:', err);
+      logger.error({ err }, 'Chat history fetch error');
     } finally {
       setIsInitializing(false);
     }
@@ -215,7 +216,7 @@ export default function ChatSessionPage() {
         if (ttsEnabled) speak(fullResponse);
       }
     } catch (err) {
-      console.error('Chat send error:', err);
+      logger.error({ err }, 'Chat send error');
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated.at(-1);
@@ -254,7 +255,7 @@ export default function ChatSessionPage() {
         setIsVisionModalOpen(true);
       }
     } catch (err) {
-      console.error('Image analysis error:', err);
+      logger.error({ err }, 'Image analysis error');
       alert('이미지 분석에 실패했습니다.');
     } finally {
       setIsAnalyzingImage(false);
@@ -287,7 +288,7 @@ export default function ChatSessionPage() {
       }
       handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
     } catch (err) {
-      console.error('Vision confirm error:', err);
+      logger.error({ err }, 'Vision confirm error');
       alert('약물 추가 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);

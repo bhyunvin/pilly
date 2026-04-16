@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldAlert, LogOut, MessageCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ export default function RestrictedPage() {
         setRestrictionInfo(result.data);
       }
     } catch (err) {
-      console.error('Failed to fetch restriction info:', err);
+      logger.error({ err }, 'Failed to fetch restriction info');
     }
   }, []);
 
