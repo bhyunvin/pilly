@@ -1,10 +1,11 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../db';
-import { chatSessions, aiChatLogs } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { chatSessions, aiChatLogs, pillCatalog, userMedications } from '../db/schema';
+import { eq, desc, ilike } from 'drizzle-orm';
 import { authPlugin } from '../middleware/auth';
 import { google } from '@ai-sdk/google';
-import { streamText } from 'ai';
+import { streamText, tool, zodSchema } from 'ai';
+import { z } from 'zod';
 import { encrypt } from '../utils/security';
 
 /**
@@ -28,8 +29,108 @@ interface ChatHistoryItem {
 }
 
 /**
+ * AI 상담 채팅에서 사용할 Function Calling 도구 정의
+ *
+ * @description
+ * 사용자가 특정 의도(약물 검색, 복약 목록 조회, 복약 알림 설정)를 표현할 때
+ * Gemini 모델이 자동으로 해당 tool을 호출합니다.
+ *
+ * @param {string} userId - 현재 인증된 사용자 ID (복약 데이터 조회에 사용)
+ */
+const createChatTools = (userId: string) => ({
+  /**
+   * 의약품 카탈로그 검색 도구
+   * 사용자가 특정 약 이름을 언급하거나 약 정보를 묻는 경우 호출됩니다.
+   */
+  searchMedication: tool({
+    description:
+      '사용자가 특정 약물의 정보를 검색하거나 찾길 원할 때 호출합니다. 약 이름, 모양, 색상으로 검색할 수 있습니다.',
+    inputSchema: zodSchema(
+      z.object({
+        keyword: z.string().describe('검색할 약물명 또는 키워드'),
+      }),
+    ),
+    execute: async ({ keyword }) => {
+      const results = await db
+        .select({
+          itemName: pillCatalog.itemName,
+          entpName: pillCatalog.entpName,
+          drugShape: pillCatalog.drugShape,
+          colorClass1: pillCatalog.colorClass1,
+          itemImage: pillCatalog.itemImage,
+          chart: pillCatalog.chart,
+        })
+        .from(pillCatalog)
+        .where(ilike(pillCatalog.itemName, `%${keyword}%`))
+        .limit(5);
+
+      if (results.length === 0) {
+        return { found: false, message: `"${keyword}"에 해당하는 약물을 찾지 못했습니다.` };
+      }
+
+      return { found: true, count: results.length, medications: results };
+    },
+  }),
+
+  /**
+   * 사용자 복약 목록 조회 도구
+   * 사용자가 본인이 등록한 복약 목록을 물어볼 때 호출됩니다.
+   */
+  getMyMedications: tool({
+    description:
+      '사용자가 현재 복용 중인 약 목록을 조회하거나 어떤 약을 먹고 있는지 묻는 경우 호출합니다.',
+    inputSchema: zodSchema(z.object({})),
+    execute: async () => {
+      const medications = await db
+        .select({
+          name: userMedications.name,
+          dosage: userMedications.dosage,
+          frequency: userMedications.frequency,
+          startDate: userMedications.startDate,
+          status: userMedications.status,
+        })
+        .from(userMedications)
+        .where(eq(userMedications.userId, userId))
+        .orderBy(desc(userMedications.createdAt));
+
+      if (medications.length === 0) {
+        return { found: false, message: '등록된 복약 정보가 없습니다.' };
+      }
+
+      return { found: true, count: medications.length, medications };
+    },
+  }),
+
+  /**
+   * 복약 알림 설정 안내 도구
+   * 사용자가 복약 알림, 타이머, 일정 설정을 요청하는 경우 호출됩니다.
+   * 실제 알림 저장은 클라이언트에서 처리합니다.
+   */
+  setMedicationReminder: tool({
+    description:
+      '사용자가 약 복용 알림이나 복약 일정을 설정하길 원할 때 호출합니다. 약 이름과 복용 시간, 빈도를 추출합니다.',
+    inputSchema: zodSchema(
+      z.object({
+        medicationName: z.string().describe('알림을 설정할 약물명'),
+        time: z.string().describe('복용 시간 (예: 오전 8시, 식후 30분 등)'),
+        frequency: z.string().describe('복용 빈도 (예: 하루 3회, 매일 등)'),
+      }),
+    ),
+    execute: async ({ medicationName, time, frequency }) => {
+      // 실제 스케줄러/푸시 알림 연동은 클라이언트 또는 별도 서비스에서 처리
+      return {
+        success: true,
+        reminder: { medicationName, time, frequency },
+        message: `${medicationName} 알림 정보를 확인했습니다. 클라이언트에서 알림을 등록해 주세요.`,
+      };
+    },
+  }),
+});
+
+/**
  * AI 복약 상담 관련 API 라우트를 정의하는 그룹
  * @description 세션 관리 및 LLM 기반의 실시간 스트리밍 채팅 기능을 제공합니다.
+ * Function Calling(tools)을 통해 약물 검색, 복약 목록 조회, 알림 설정 의도를 처리합니다.
  * 보안을 위해 대화 내역은 암호화되어 저장됩니다.
  *
  * @param {Elysia} app - Elysia 애플리케이션 인스턴스
@@ -100,11 +201,14 @@ export const createChatRoutes = (app: Elysia) => {
       )
 
       /**
-       * 실시간 AI 메시징 및 스트리밍 응답
+       * 실시간 AI 메시징 및 스트리밍 응답 (Function Calling 포함)
        * @description 특정 세션 내에서 AI에게 메시지를 전송하고 Gemini AI로부터 실시간 스트리밍 답변을 받습니다.
        * 1. 사용자 질문을 암호화하여 즉시 DB에 기록 (유실 방지)
-       * 2. Gemini 1.5 Flash 모델을 통한 전문 복약 지도 답변 생성
-       * 3. 답변 완료 후 암호화된 응답을 DB에 업데이트
+       * 2. Gemini 모델을 통한 전문 복약 지도 답변 생성
+       * 3. Function Calling tools를 통해 약물 검색/복약 목록 조회/알림 설정 의도 처리
+       * 4. 답변 완료 후 암호화된 응답을 DB에 업데이트
+       *
+       * [NOTE]: 고도의 추론이 필요한 경우 google('gemini-3.1-pro')로 교체 검토
        *
        * @async
        * @param {Object} context - 요청 컨텍스트
@@ -143,10 +247,12 @@ export const createChatRoutes = (app: Elysia) => {
             .returning();
 
           const result = streamText({
-            model: google('gemini-1.5-flash'),
+            // [NOTE]: 복잡한 약물 상호작용 분석이 필요한 경우 google('gemini-3.1-pro') 사용 권장
+            model: google('gemini-3.1-flash'),
             system:
-              '당신은 전문 약사 AI "Pilly"입니다. 사용자의 건강 상태와 약물 정보를 바탕으로 안전하고 전문적인 복약 지도를 수행하세요. 답변은 한국어로 친절하게 작성하세요.',
+              '당신은 전문 약사 AI "Pilly"입니다. 사용자의 건강 상태와 약물 정보를 바탕으로 안전하고 전문적인 복약 지도를 수행하세요. 답변은 한국어로 친절하게 작성하세요. 약물 검색이나 복약 목록 조회, 알림 설정이 필요하면 제공된 도구(tool)를 적극적으로 활용하세요.',
             messages,
+            tools: createChatTools(userId),
             onFinish: async ({ text }) => {
               // 2. 답변 완료 시 해당 레코드 업데이트
               await db
@@ -175,8 +281,9 @@ export const createChatRoutes = (app: Elysia) => {
             ),
           }),
           detail: {
-            summary: '실시간 AI 메시징',
-            description: '질문을 전송하고 Gemini AI로부터 실시간 스트리밍 답변을 받습니다.',
+            summary: '실시간 AI 메시징 (Function Calling 포함)',
+            description:
+              '질문을 전송하고 Gemini AI로부터 실시간 스트리밍 답변을 받습니다. 약물 검색, 복약 목록 조회, 알림 설정 기능을 지원합니다.',
             tags: ['Chat'],
           },
         },

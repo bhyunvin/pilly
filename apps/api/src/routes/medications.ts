@@ -4,7 +4,24 @@ import { userMedications } from '../db/schema';
 import { authPlugin } from '../middleware/auth';
 import { eq, desc } from 'drizzle-orm';
 import { google } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { generateText, Output, zodSchema } from 'ai';
+import { z } from 'zod';
+
+/**
+ * Vision AI가 이미지에서 추출하는 약물 정보 스키마
+ * @description generateText({ output })이 이 스키마에 따라 구조화된 응답을 보장합니다.
+ */
+const analyzeImageSchema = z.object({
+  medications: z
+    .array(
+      z.object({
+        name: z.string().describe('약품명'),
+        dosage: z.string().describe('용량 및 용법 (예: 1정, 500mg 등)'),
+        frequency: z.string().describe('복용 빈도 (예: 하루 3회, 식후 30분 등)'),
+      }),
+    )
+    .describe('이미지에서 식별된 약물 목록'),
+});
 
 /**
  * 복약 관리 라우트 팩토리 함수
@@ -20,10 +37,6 @@ export const createMedicationRoutes = (app: Elysia) => {
       /**
        * 사용자의 복약 목록 조회
        * @description 현재 로그인한 사용자의 모든 복약 기록을 최신순으로 가져옵니다.
-       * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {string} context.userId - 인증된 사용자 ID
-       * @returns {Promise<Array<Object>>} 복약 목록 리스트
        */
       .get(
         '/',
@@ -46,12 +59,6 @@ export const createMedicationRoutes = (app: Elysia) => {
       /**
        * 새로운 복약 정보 추가
        * @description 사용자가 직접 입력한 약품명, 용법, 빈도 등의 정보를 저장합니다.
-       * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {Object} context.body - 복약 정보 본문 (name, dosage, frequency, startDate)
-       * @param {string} context.userId - 인증된 사용자 ID
-       * @param {Object} context.set - 응답 상태 설정 객체
-       * @returns {Promise<{success: boolean, data: Object}>} 생성된 복약 레코드
        */
       .post(
         '/',
@@ -89,56 +96,53 @@ export const createMedicationRoutes = (app: Elysia) => {
       /**
        * 이미지 분석을 통한 복약 정보 추출 (Vision AI)
        * @description 처방전이나 약 봉투 사진을 분석하여 약품명, 용법, 빈도를 구조화된 데이터로 추출합니다.
-       * Gemini 3.1 Flash Vision 모델을 사용하여 이미지 내의 텍스트와 맥락을 파악합니다.
+       * SDK v6의 generateText({ output }) 방식을 사용하여 타입 안전한 파싱을 보장합니다.
        *
        * @async
        * @param {Object} context - 요청 컨텍스트
        * @param {Object} context.body - 요청 본문 (image: File)
-       * @returns {Promise<{success: boolean, data: Array<Object>}>} 추출된 약물 정보 배열
+       * @param {Object} context.set - 응답 상태 설정 객체
+       * @returns {Promise<{success: boolean, data: AnalyzeImageResult['medications']}>} 추출된 약물 정보 배열
        */
       .post(
         '/analyze-image',
-        async ({ body }) => {
+        async ({ body, set }) => {
           const { image } = body;
           const buffer = Buffer.from(await image.arrayBuffer());
           const base64Image = buffer.toString('base64');
 
-          const messages = [
-            {
-              role: 'user' as const,
-              content: [
-                {
-                  type: 'text' as const,
-                  text: '이 사진에서 약 정보를 추출해줘. 반드시 다음과 같은 순수 JSON 문자열 형식으로 응답해: {"medications":[{"name": "약품명", "dosage": "용량", "frequency": "복용빈도"}]}',
-                },
-                { type: 'image' as const, image: base64Image },
-              ],
-            },
-          ];
-
-          const { text } = await generateText({
-            model: google('gemini-3.1-flash'),
-            messages,
-          });
-
-          let jsonText = text.trim();
-          if (jsonText.startsWith('```json')) {
-            jsonText = jsonText.substring(7);
-          }
-          if (jsonText.endsWith('```')) {
-            jsonText = jsonText.substring(0, jsonText.length - 3);
-          }
-          jsonText = jsonText.trim();
-
-          let data;
           try {
-            data = JSON.parse(jsonText).medications;
-          } catch (e) {
-            console.error('Vision AI JSON parse error:', e);
-            data = [];
-          }
+            // SDK v6: generateObject 대신 generateText({ output }) 사용 (deprecated 경고 해결)
+            const { output } = await generateText({
+              // 고도의 이미지 추론이 필요한 경우 google('gemini-3.1-pro') 사용을 고려하세요.
+              model: google('gemini-3.1-flash'),
+              // Output.object를 통해 Zod 스키마와 결합된 구조화된 출력을 생성합니다.
+              output: Output.object({
+                schema: zodSchema(analyzeImageSchema),
+              }),
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: '이 사진에서 약 정보를 추출해 주세요. 사진에 보이는 모든 약품명, 용량, 복용 빈도를 식별해 주세요.',
+                    },
+                    { type: 'image', image: base64Image },
+                  ],
+                },
+              ],
+            });
 
-          return { success: true, data };
+            return { success: true, data: output.medications };
+          } catch (e) {
+            console.error('[Vision AI] 이미지 분석 실패:', e);
+            set.status = 500;
+            return {
+              success: false,
+              error: '이미지 분석에 실패했습니다. 사진을 다시 찍거나 직접 입력해 주세요.',
+            };
+          }
         },
         {
           body: t.Object({
