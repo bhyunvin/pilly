@@ -7,6 +7,7 @@ import { google } from '@ai-sdk/google';
 import { streamText, tool, zodSchema } from 'ai';
 import { z } from 'zod';
 import { encrypt } from '../utils/security';
+import { determineAIModel, MODELS, SYSTEM_PROMPTS } from '../utils/ai';
 
 /**
  * 채팅 히스토리 메시지 텍스트 파트 구조
@@ -235,6 +236,11 @@ export const createChatRoutes = (app: Elysia) => {
             }),
           );
 
+          // 모델 동적 선택 및 시스템 프롬프트 할당
+          const selectedModel = await determineAIModel(userPrompt);
+          const systemPrompt =
+            selectedModel === MODELS.PRO ? SYSTEM_PROMPTS.PRO : SYSTEM_PROMPTS.FLASH;
+
           // 1. 대화 기록 레코드 선행 생성 (질문 유실 방지)
           const [logRecord] = await db
             .insert(aiChatLogs)
@@ -247,13 +253,17 @@ export const createChatRoutes = (app: Elysia) => {
             .returning();
 
           const result = streamText({
-            // [NOTE]: 복잡한 약물 상호작용 분석이 필요한 경우 google('gemini-3.1-pro') 사용 권장
-            model: google('gemini-3.1-flash'),
-            system:
-              '당신은 전문 약사 AI "Pilly"입니다. 사용자의 건강 상태와 약물 정보를 바탕으로 안전하고 전문적인 복약 지도를 수행하세요. 답변은 한국어로 친절하게 작성하세요. 약물 검색이나 복약 목록 조회, 알림 설정이 필요하면 제공된 도구(tool)를 적극적으로 활용하세요.',
+            model: google(selectedModel),
+            system: systemPrompt,
             messages,
             tools: createChatTools(userId),
-            onFinish: async ({ text }) => {
+            onFinish: async ({ text, usage }) => {
+              // 토큰 사용량 로깅
+              console.log(`[AI Usage Log] Model: ${selectedModel}`);
+              console.log(
+                `Input Tokens: ${usage.inputTokens}, Output Tokens: ${usage.outputTokens}, Total: ${usage.totalTokens}`,
+              );
+
               // 2. 답변 완료 시 해당 레코드 업데이트
               await db
                 .update(aiChatLogs)
