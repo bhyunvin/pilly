@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { authClient } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface ChatSession {
   id: number;
@@ -86,8 +87,8 @@ export function Sidebar() {
     fetchProfile();
     fetchSessions();
 
-    window.addEventListener('refresh-sessions', fetchSessions);
-    return () => window.removeEventListener('refresh-sessions', fetchSessions);
+    globalThis.addEventListener('refresh-sessions', fetchSessions);
+    return () => globalThis.removeEventListener('refresh-sessions', fetchSessions);
   }, []);
 
   const handleStartEdit = (session: ChatSession) => {
@@ -125,7 +126,7 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-64 border-r bg-background md:flex flex-col">
-      <div className="flex h-16 items-center px-6 border-b">
+      <div className="flex h-16 items-center justify-between px-6 border-b shrink-0">
         <Link
           href="/"
           className="flex items-center gap-2 font-bold text-xl text-green-800 dark:text-green-400"
@@ -133,69 +134,74 @@ export function Sidebar() {
           <Pill className="rotate-45" aria-hidden="true" />
           <span>Pilly</span>
         </Link>
+        <ThemeToggle />
       </div>
 
       <nav className="flex-1 overflow-y-auto">
-        <div className="space-y-1 px-3 py-4" role="list">
+        <div className="px-3 py-4">
           <p
             className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-            role="presentation"
+            aria-hidden="true"
           >
             Menu
           </p>
-          {navItems.map(({ label, icon: Icon, href }) => {
-            const isActive = pathname === href;
-            return (
-              <div key={href} role="listitem">
-                <Link
-                  href={href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                    isActive
-                      ? 'bg-primary/15 text-green-900 dark:text-green-300'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )}
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  {label}
-                </Link>
-              </div>
-            );
-          })}
+          <ul className="space-y-1">
+            {navItems.map(({ label, icon: Icon, href }) => {
+              const isActive = pathname === href;
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                      isActive
+                        ? 'bg-primary/15 text-green-900 dark:text-green-300'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
 
           {isAdmin && (
-            <div className="mt-4 pt-4 border-t space-y-1" role="presentation">
+            <div className="mt-4 pt-4 border-t">
               <p className="px-3 mb-2 text-xs font-semibold text-destructive uppercase tracking-wider">
                 Admin Panel
               </p>
-              <div role="listitem">
-                <Link
-                  href="/admin/users"
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                    pathname === '/admin/users'
-                      ? 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )}
-                >
-                  <ShieldAlert size={18} aria-hidden="true" />
-                  사용자 관리
-                </Link>
-              </div>
-              <div role="listitem">
-                <Link
-                  href="/admin/withdrawals"
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                    pathname === '/admin/withdrawals'
-                      ? 'bg-destructive/10 text-destructive border-l-4 border-destructive rounded-l-none'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )}
-                >
-                  <UserMinus size={18} aria-hidden="true" />
-                  탈퇴 예정자 관리
-                </Link>
-              </div>
+              <ul className="space-y-1">
+                <li>
+                  <Link
+                    href="/admin/users"
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                      pathname === '/admin/users'
+                        ? 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )}
+                  >
+                    <ShieldAlert size={18} aria-hidden="true" />
+                    사용자 관리
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/admin/withdrawals"
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                      pathname === '/admin/withdrawals'
+                        ? 'bg-destructive/10 text-destructive border-l-4 border-destructive rounded-l-none'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )}
+                  >
+                    <UserMinus size={18} aria-hidden="true" />
+                    탈퇴 예정자 관리
+                  </Link>
+                </li>
+              </ul>
             </div>
           )}
         </div>
@@ -204,14 +210,14 @@ export function Sidebar() {
           <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Recent Chats
           </p>
-          <div className="space-y-1" role="list">
+          <ul className="space-y-1">
             {sessions.length > 0 ? (
               sessions.map((session) => {
                 const isActive = pathname === `/chat/${session.id}`;
                 const isEditing = editingId === session.id;
 
                 return (
-                  <div key={session.id} className="group relative" role="listitem">
+                  <li key={session.id} className="group relative">
                     {isEditing ? (
                       <div className="flex items-center gap-1 px-2 py-1">
                         <Input
@@ -265,17 +271,17 @@ export function Sidebar() {
                         </div>
                       </>
                     )}
-                  </div>
+                  </li>
                 );
               })
             ) : (
-              <div role="listitem">
+              <li>
                 <p className="px-3 py-2 text-xs text-muted-foreground italic">
                   상담 내역이 없습니다.
                 </p>
-              </div>
+              </li>
             )}
-          </div>
+          </ul>
         </div>
       </nav>
 

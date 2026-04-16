@@ -7,12 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Pill, ArrowLeft, X, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { Pill } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 export default function LoginPage() {
-  const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -72,259 +77,264 @@ export default function LoginPage() {
         {/* 공통 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div className="flex items-center gap-2">
-            {step === 2 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-8 h-8 rounded-full active:scale-95 shrink-0"
-                onClick={() => setStep(1)}
-              >
-                <ArrowLeft size={18} />
-              </Button>
-            )}
             <Pill size={24} className="text-primary rotate-45 shrink-0" />
-            <span className="font-bold text-lg tracking-tight hidden sm:inline-block">Pilly</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground mr-1">
-              Step {step} of 2
-            </span>
-            {step === 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden sm:flex text-xs disabled:opacity-50"
-                disabled
-              >
-                Next <ChevronRight size={14} className="ml-1" />
-              </Button>
-            )}
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full active:scale-95">
-              <X size={18} />
-            </Button>
+            <span className="font-bold text-lg tracking-tight">Pilly</span>
           </div>
         </div>
 
-        {/* Step 1: General Terms */}
-        {step === 1 && (
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <CardHeader className="shrink-0 pb-4">
-              <CardTitle className="text-2xl font-bold">서비스 이용약관</CardTitle>
-              <CardDescription>
-                Pilly 서비스 이용을 위한 기본 약관입니다. 내용을 확인해주세요.
-              </CardDescription>
-            </CardHeader>
+        <form className="flex flex-col flex-1 overflow-hidden" onSubmit={handleLogin}>
+          <CardHeader className="shrink-0 pb-4">
+            <CardTitle className="text-2xl font-bold">Pilly 시작하기</CardTitle>
+            <CardDescription>AI와 함께하는 스마트한 약 복용 관리</CardDescription>
+          </CardHeader>
 
-            <CardContent className="flex-1 overflow-y-auto px-6 py-2">
-              <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed space-y-6 pb-6">
-                <div>
-                  <h3 className="text-foreground font-semibold text-base mb-2">제 1 조 (목적)</h3>
-                  <p className="mb-4">
-                    본 약관은 'Pilly'(이하 "회사"라 함)가 제공하는 AI 복약 가이드 서비스 및 관련
-                    제반 서비스의 이용과 관련하여 회사와 이용자 간의 권리, 의무 및 책임사항, 기타
-                    필요한 사항을 규정함을 목적으로 합니다.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold text-base mb-2">
-                    제 2 조 (의료 정보 제공의 한계 및 면책)
-                  </h3>
-                  <p className="mb-2 text-foreground font-medium">
-                    본 서비스가 제공하는 모든 정보(AI 답변 포함)는 참고용이며, 어떠한 경우에도
-                    의사의 진단이나 약사의 처방을 대신할 수 없습니다.
-                  </p>
-                  <p className="mb-2">
-                    사용자는 본 서비스의 정보를 신뢰하기 전 반드시 전문 의료인과 상담해야 합니다.
-                    회사는 본 서비스의 정보를 이용함에 따라 발생하는 직접적, 간접적 손해에 대해
-                    책임을 지지 않습니다.
-                  </p>
-                  <p className="mb-4">
-                    AI 모델(Gemini 등)의 특성상 답변에 오류가 있을 수 있으며, 회사는 정보의 정확성,
-                    완전성, 시의성을 보장하지 않습니다.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold text-base mb-2">
-                    제 3 조 (이용자의 의무)
-                  </h3>
-                  <p className="mb-4">
-                    이용자는 처방전 사진 등을 업로드할 때 본인의 성명, 주민등록번호 등 민감한
-                    개인식별정보를 반드시 가린 후 업로드해야 하며, 이를 이행하지 않아 발생하는 정보
-                    유출 사고의 책임은 이용자 본인에게 있습니다.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold text-base mb-2">
-                    제 4 조 (관할 법원)
-                  </h3>
-                  <p>
-                    서비스 이용과 관련하여 발생한 분쟁에 대해서는 회사의 본사 소재지를 관할하는
-                    법원을 전용 관할 법원으로 합니다.
-                  </p>
-                </div>
-
-                <p className="text-xs pt-6 pb-2">시행일자: 2026년 4월 9일</p>
-              </div>
-            </CardContent>
-
-            <div className="shrink-0 p-6 pt-4 border-t mt-auto shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10 bg-background">
-              <Button
-                className="w-full h-14 text-base font-semibold active:scale-[0.98] transition-transform"
-                onClick={() => setStep(2)}
-              >
-                동의하고 계속하기
-              </Button>
+          <CardContent className="flex-1 overflow-y-auto px-6 py-2 pb-6 space-y-8">
+            {/* 이메일 입력 */}
+            <div className="space-y-3">
+              <Label htmlFor="email" className="font-semibold">
+                이메일 주소
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                className="h-12 text-base"
+                placeholder="name@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
             </div>
-          </div>
-        )}
 
-        {/* Step 2: Privacy/Terms Checkbox Form */}
-        {step === 2 && (
-          <form className="flex flex-col flex-1 overflow-hidden" onSubmit={handleLogin}>
-            <CardHeader className="shrink-0 pb-4">
-              <CardTitle className="text-2xl font-bold">Pilly 시작하기</CardTitle>
-              <CardDescription>AI와 함께하는 스마트한 약 복용 관리</CardDescription>
-            </CardHeader>
-
-            <CardContent className="flex-1 overflow-y-auto px-6 py-2 pb-6 space-y-8">
-              {/* 이메일 입력 */}
-              <div className="space-y-3">
-                <Label htmlFor="email" className="font-semibold">
-                  이메일 주소
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  className="h-12 text-base"
-                  placeholder="name@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                />
+            {/* 약관 동의 폼 영역 */}
+            <div className="space-y-4">
+              <div className="pb-3 border-b-2 border-primary/20">
+                <h3 className="text-lg font-bold">서비스 이용에 동의해주세요.</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  원활한 서비스 이용을 위해 필수 항목 동의가 필요합니다.
+                </p>
               </div>
 
-              {/* 약관 동의 폼 영역 */}
-              <div className="space-y-4">
-                <div className="pb-3 border-b-2 border-primary/20">
-                  <h3 className="text-lg font-bold">서비스 이용에 동의해주세요.</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    원활한 서비스 이용을 위해 필수 항목 동의가 필요합니다.
-                  </p>
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border hover:bg-muted transition-colors active:scale-[0.99] cursor-pointer">
+                  <Checkbox
+                    id="all"
+                    checked={consents.all}
+                    onCheckedChange={(c) => handleAllConsentChange(!!c)}
+                    className="w-5 h-5 rounded-md"
+                  />
+                  <Label
+                    htmlFor="all"
+                    className="flex-1 text-base font-bold cursor-pointer select-none"
+                  >
+                    전체 동의하기
+                  </Label>
                 </div>
 
-                <div className="space-y-4 pt-2">
-                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border hover:bg-muted transition-colors active:scale-[0.99] cursor-pointer">
+                <div className="pl-2 space-y-4 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-border">
+                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
                     <Checkbox
-                      id="all"
-                      checked={consents.all}
-                      onCheckedChange={(c) => handleAllConsentChange(!!c)}
-                      className="w-5 h-5 rounded-md"
+                      id="terms"
+                      checked={consents.terms}
+                      onCheckedChange={(c) => handleSingleConsentChange('terms', !!c)}
+                      className="mt-0.5"
                     />
-                    <Label
-                      htmlFor="all"
-                      className="flex-1 text-base font-bold cursor-pointer select-none"
-                    >
-                      전체 동의하기
-                    </Label>
+                    <div className="flex-1 flex items-center justify-between">
+                      <Label
+                        htmlFor="terms"
+                        className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                      >
+                        <span className="text-primary font-bold">[필수]</span> 서비스 이용약관 동의
+                      </Label>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
+                          >
+                            보기
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xl" showCloseButton>
+                          <DialogHeader>
+                            <DialogTitle>서비스 이용약관</DialogTitle>
+                            <DialogDescription>
+                              Pilly 서비스 이용을 위한 기본 약관입니다.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-4 text-sm text-muted-foreground leading-relaxed">
+                            <div>
+                              <h3 className="text-foreground font-semibold mb-1">제 1 조 (목적)</h3>
+                              <p>
+                                본 약관은 'Pilly'(이하 "회사"라 함)가 제공하는 AI 복약 가이드 서비스
+                                및 관련 제반 서비스의 이용과 관련하여 회사와 이용자 간의 권리, 의무
+                                및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.
+                              </p>
+                            </div>
+                            <div>
+                              <h3 className="text-foreground font-semibold mb-1">
+                                제 2 조 (의료 정보 제공의 한계 및 면책)
+                              </h3>
+                              <p className="mb-2 text-foreground font-medium">
+                                본 서비스가 제공하는 모든 정보(AI 답변 포함)는 참고용이며, 어떠한
+                                경우에도 의사의 진단이나 약사의 처방을 대신할 수 없습니다.
+                              </p>
+                              <p className="mb-2">
+                                사용자는 본 서비스의 정보를 신뢰하기 전 반드시 전문 의료인과
+                                상담해야 합니다. 회사는 본 서비스의 정보를 이용함에 따라 발생하는
+                                직접적, 간접적 손해에 대해 책임을 지지 않습니다.
+                              </p>
+                              <p>
+                                AI 모델(Gemini 등)의 특성상 답변에 오류가 있을 수 있으며, 회사는
+                                정보의 정확성, 완전성, 시의성을 보장하지 않습니다.
+                              </p>
+                            </div>
+                            <div>
+                              <h3 className="text-foreground font-semibold mb-1">
+                                제 3 조 (이용자의 의무)
+                              </h3>
+                              <p>
+                                이용자는 처방전 사진 등을 업로드할 때 본인의 성명, 주민등록번호 등
+                                민감한 개인식별정보를 반드시 가린 후 업로드해야 하며, 이를 이행하지
+                                않아 발생하는 정보 유출 사고의 책임은 이용자 본인에게 있습니다.
+                              </p>
+                            </div>
+                            <div>
+                              <h3 className="text-foreground font-semibold mb-1">
+                                제 4 조 (관할 법원)
+                              </h3>
+                              <p>
+                                서비스 이용과 관련하여 발생한 분쟁에 대해서는 회사의 본사 소재지를
+                                관할하는 법원을 전용 관할 법원으로 합니다.
+                              </p>
+                            </div>
+                            <p className="text-xs pt-4">시행일자: 2026년 4월 9일</p>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
 
-                  <div className="pl-2 space-y-4 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-border">
-                    <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                      <Checkbox
-                        id="terms"
-                        checked={consents.terms}
-                        onCheckedChange={(c) => handleSingleConsentChange('terms', !!c)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 flex items-center justify-between">
-                        <Label
-                          htmlFor="terms"
-                          className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                        >
-                          <span className="text-primary font-bold">[필수]</span> 서비스 이용약관
-                          동의
-                        </Label>
-                        <Link
-                          href="/terms"
-                          target="_blank"
-                          className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          보기
-                        </Link>
-                      </div>
+                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
+                    <Checkbox
+                      id="privacy"
+                      checked={consents.privacy}
+                      onCheckedChange={(c) => handleSingleConsentChange('privacy', !!c)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 flex items-center justify-between">
+                      <Label
+                        htmlFor="privacy"
+                        className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                      >
+                        <span className="text-primary font-bold">[필수]</span> 개인정보 수집 및 이용
+                        동의
+                      </Label>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
+                          >
+                            보기
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xl" showCloseButton>
+                          <DialogHeader>
+                            <DialogTitle>개인정보 수집 및 이용 동의</DialogTitle>
+                          </DialogHeader>
+                          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-4 text-sm text-muted-foreground leading-relaxed">
+                            <p>
+                              회사는 원활한 서비스 제공을 위해 최소한의 범위 내에서 개인정보를
+                              수집하고 있습니다.
+                            </p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              <li>수집 항목: 이메일 (로그인 목적)</li>
+                              <li>수집 목적: 서비스 이용자 식별 및 서비스 제공</li>
+                              <li>보유 및 이용기간: 회원 탈퇴 시 파기 또는 법령에 따른 보존기간</li>
+                            </ul>
+                            <p>
+                              사용자는 동의를 거부할 권리가 있으나, 거부 시 서비스 이용이 제한될 수
+                              있습니다.
+                            </p>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
+                  </div>
 
-                    <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                      <Checkbox
-                        id="privacy"
-                        checked={consents.privacy}
-                        onCheckedChange={(c) => handleSingleConsentChange('privacy', !!c)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 flex items-center justify-between">
-                        <Label
-                          htmlFor="privacy"
-                          className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                        >
-                          <span className="text-primary font-bold">[필수]</span> 개인정보 수집 및
-                          이용 동의
-                        </Label>
-                        <Link
-                          href="/privacy"
-                          target="_blank"
-                          className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          보기
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                      <Checkbox
-                        id="sensitive"
-                        checked={consents.sensitive}
-                        onCheckedChange={(c) => handleSingleConsentChange('sensitive', !!c)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 flex items-start flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <Label
-                          htmlFor="sensitive"
-                          className="text-sm flex flex-1 items-start gap-1.5 cursor-pointer leading-snug select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                        >
-                          <span className="text-primary font-bold shrink-0">[필수]</span>
-                          <span>민감정보(건강 및 복약 기록 등) 수집/이용 동의</span>
-                        </Label>
-                      </div>
+                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
+                    <Checkbox
+                      id="sensitive"
+                      checked={consents.sensitive}
+                      onCheckedChange={(c) => handleSingleConsentChange('sensitive', !!c)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 flex items-start flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <Label
+                        htmlFor="sensitive"
+                        className="text-sm flex flex-1 items-start gap-1.5 cursor-pointer leading-snug select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                      >
+                        <span className="text-primary font-bold shrink-0">[필수]</span>
+                        <span>민감정보(건강 및 복약 기록 등) 수집/이용 동의</span>
+                      </Label>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1 shrink-0"
+                          >
+                            보기
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xl" showCloseButton>
+                          <DialogHeader>
+                            <DialogTitle>민감정보 수집/이용 동의</DialogTitle>
+                          </DialogHeader>
+                          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-4 text-sm text-muted-foreground leading-relaxed">
+                            <p>
+                              서비스의 특성상 다음과 같은 민감정보가 수집될 수 있으며, 이는 AI
+                              모델(Gemini)에 의해 분석될 수 있습니다.
+                            </p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              <li>
+                                수집 항목: 처방전 이미지, 사용 중인 약품 정보, 질환 및 증상 정보,
+                                건강 상태 기록
+                              </li>
+                              <li>수집 목적: 개인화된 복약 가이드 및 상호작용 검토 제공</li>
+                            </ul>
+                            <p className="font-semibold text-foreground mt-2">
+                              사용자는 민감정보 업로드 시 이름, 주민등록번호 등 직접적인 개인 식별
+                              정보를 반드시 삭제/은폐해야 합니다.
+                            </p>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {message && (
-                <div
-                  className={`p-4 rounded-md text-sm font-medium ${message.includes('확인') ? 'bg-green-50 text-green-700 dark:bg-green-900/30' : 'bg-destructive/10 text-destructive'}`}
-                >
-                  {message}
-                </div>
-              )}
-            </CardContent>
-
-            <div className="shrink-0 p-6 pt-4 border-t-2 border-border shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-10 bg-background mt-auto">
-              <Button
-                className="w-full h-14 text-base font-semibold active:scale-[0.98] transition-transform"
-                type="submit"
-                disabled={isLoading || !allConsented || !email}
-              >
-                {isLoading ? '요청 중...' : '동의하고 계속하기'}
-              </Button>
             </div>
-          </form>
-        )}
+
+            {message && (
+              <div
+                className={`p-4 rounded-md text-sm font-medium ${message.includes('확인') ? 'bg-green-50 text-green-700 dark:bg-green-900/30' : 'bg-destructive/10 text-destructive'}`}
+              >
+                {message}
+              </div>
+            )}
+          </CardContent>
+
+          <div className="shrink-0 px-6 py-5 border-t-2 border-border shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-10 bg-background mt-auto">
+            <Button
+              className="w-full h-14 text-base font-semibold active:scale-[0.98] transition-transform"
+              type="submit"
+              disabled={isLoading || !allConsented || !email}
+            >
+              {isLoading ? '요청 중...' : '동의하고 계속하기'}
+            </Button>
+          </div>
+        </form>
       </Card>
     </div>
   );
