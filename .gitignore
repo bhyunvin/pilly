@@ -27,3 +27,13 @@ build
 
 # OS
 .DS_Store
+
+# Test results
+playwright-report
+test-results
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Drizzle generated files
+drizzle/
