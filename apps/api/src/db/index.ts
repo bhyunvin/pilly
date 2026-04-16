@@ -9,7 +9,7 @@ const DB_PASSWORD = process.env.DB_PASSWORD;
 const DB_NAME = process.env.DB_NAME;
 
 // Neon Serverless 또는 일반 Postgres 연결을 위한 URL 조합
-const dbUrl = `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&channel_binding=require`;
+const dbUrl = `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=verify-full&channel_binding=require`;
 
 const sql = neon(dbUrl);
 export const db = drizzle(sql, { schema });

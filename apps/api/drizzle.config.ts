@@ -5,7 +5,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
 
 const { DB_HOST, DB_PORT = '5432', DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-const dbUrl = `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&channel_binding=require`;
+const dbUrl = `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=verify-full&channel_binding=require`;
 
 export default defineConfig({
   dialect: 'postgresql',
