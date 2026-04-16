@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { pillCatalog } from '../db/schema';
 import { sql } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 /**
  * 공공 데이터 API에서 반환되는 개별 약물 항목의 구조입니다.
@@ -51,13 +52,13 @@ interface PillApiResponse {
  * @throws {Error} API 요청 실패 또는 DB 작업 중 오류 발생 시 에러를 던집니다.
  */
 export async function updatePillDatabase() {
-  console.log('💊 Starting Pill Database Sync...');
+  logger.info('💊 Starting Pill Database Sync...');
 
   const apiKey = process.env.DATA_GO_KR_API_KEY;
   const endpoint = process.env.DATA_GO_KR_ENDPOINT;
 
   if (!apiKey || !endpoint) {
-    console.error('❌ Sync Failed: Missing API configuration');
+    logger.error('❌ Sync Failed: Missing API configuration');
     return;
   }
 
@@ -67,7 +68,7 @@ export async function updatePillDatabase() {
 
   try {
     while (hasMore) {
-      console.log(`📡 Fetching page ${pageNo}...`);
+      logger.info(`📡 Fetching page ${pageNo}...`);
 
       const url = new URL(endpoint);
       url.searchParams.append('serviceKey', apiKey);
@@ -121,7 +122,7 @@ export async function updatePillDatabase() {
           },
         });
 
-      console.log(`✅ Page ${pageNo} synced (${pillItems.length} items)`);
+      logger.info(`✅ Page ${pageNo} synced (${pillItems.length} items)`);
 
       if (pillItems.length < numOfRows) {
         hasMore = false;
@@ -132,9 +133,9 @@ export async function updatePillDatabase() {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    console.log('✨ Pill Database Sync Completed!');
+    logger.info('✨ Pill Database Sync Completed!');
   } catch (error) {
-    console.error('❌ Sync Error:', error);
+    logger.error({ err: error }, '❌ Sync Error:');
     throw error;
   }
 }

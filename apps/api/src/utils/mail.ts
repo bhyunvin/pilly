@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from './logger';
 
 // 문자열 URL 대신 객체 방식을 사용하여 SonarJS 린트 에러 해결 및 보안성 향상
 /**
@@ -29,7 +30,7 @@ const transporter = nodemailer.createTransport({
  */
 export const sendAccessAlertEmail = async (userEmail: string, sessionId: number) => {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    console.warn('Mail config missing. Skip sending email.');
+    logger.warn('Mail config missing. Skip sending email.');
     return;
   }
 
@@ -42,8 +43,8 @@ export const sendAccessAlertEmail = async (userEmail: string, sessionId: number)
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`Access alert email sent to ${userEmail} for session ${sessionId}`);
+    logger.info(`Access alert email sent to ${userEmail} for session ${sessionId}`);
   } catch (error) {
-    console.error('Error sending access alert email:', error);
+    logger.error({ err: error }, 'Error sending access alert email:');
   }
 };

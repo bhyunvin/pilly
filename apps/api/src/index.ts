@@ -9,6 +9,7 @@ import { createInquiryRoutes } from './routes/inquiry';
 import { createProfileRoutes } from './routes/profile';
 import { createAdminRoutes } from './routes/admin';
 import { schedulerPlugin } from './plugins/scheduler';
+import { logger } from './utils/logger';
 
 /**
  * Pilly 백엔드 서비스의 핵심 Elysia 애플리케이션 인스턴스입니다.
@@ -18,6 +19,7 @@ import { schedulerPlugin } from './plugins/scheduler';
  * `/api/v1` 경로 아래에 각 도메인별 라우트(프로필, 채팅, 복약, 검색 등)를 통합합니다.
  */
 const app = new Elysia()
+  .use(logger.into())
   .use(
     swagger({
       documentation: {
@@ -43,7 +45,7 @@ const app = new Elysia()
    */
   .onError(({ code, error, set }) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[API Error] Code: ${code}, Message: ${errorMessage}`);
+    logger.error(`[API Error] Code: ${code}, Message: ${errorMessage}`);
 
     // 보안: 내부 정보 유출 방지를 위한 에러 메시지 정제
     if (code === 'NOT_FOUND') {
@@ -74,6 +76,6 @@ const app = new Elysia()
   )
   .listen(process.env.PORT || 3001);
 
-console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+logger.info(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 
 export type App = typeof app;

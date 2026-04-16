@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google';
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
+import { logger } from './logger';
 
 /**
  * AI 모델 관련 유틸리티 및 상수 정의
@@ -53,11 +54,11 @@ export const determineAIModel = async (prompt: string): Promise<string> => {
       prompt: `사용자 질문: "${prompt}"`,
     });
 
-    console.log(`[AI Classifier] Complexity: ${object.complexity}, Reason: ${object.reasoning}`);
+    logger.info(`[AI Classifier] Complexity: ${object.complexity}, Reason: ${object.reasoning}`);
 
     return object.complexity === 'complex' ? MODELS.PRO : MODELS.FLASH;
   } catch (error) {
-    console.error('[AI Classifier Error] Fallback to Flash:', error);
+    logger.error({ err: error }, '[AI Classifier Error] Fallback to Flash:');
     return MODELS.FLASH; // 에러 발생 시 안전하게 Flash로 폴백
   }
 };

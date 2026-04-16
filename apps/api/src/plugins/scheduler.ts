@@ -4,6 +4,7 @@ import { db } from '../db';
 import { userProfiles, userInquiries, inquiryAttachments } from '../db/schema';
 import { lt, inArray, eq } from 'drizzle-orm';
 import { cloudinaryService } from '../services/cloudinary.service';
+import { logger } from '../utils/logger';
 
 /**
  * 삭제된 계정의 물리적 데이터를 유지하는 유예 기간(일)입니다.
@@ -26,7 +27,7 @@ export const schedulerPlugin = new Elysia().use(
     name: 'user-cleanup',
     pattern: '0 3 * * *', // 매일 새벽 3시
     async run() {
-      console.log(`--- Start Hard Deleting Expired Accounts (${GRACE_PERIOD_DAYS} days) ---`);
+      logger.info(`--- Start Hard Deleting Expired Accounts (${GRACE_PERIOD_DAYS} days) ---`);
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() - GRACE_PERIOD_DAYS);
 
@@ -38,7 +39,7 @@ export const schedulerPlugin = new Elysia().use(
           .where(lt(userProfiles.deletedAt, expirationDate));
 
         if (expiredUsers.length === 0) {
-          console.log('No expired accounts to delete.');
+          logger.info('No expired accounts to delete.');
           return;
         }
 
@@ -53,7 +54,7 @@ export const schedulerPlugin = new Elysia().use(
           .where(inArray(userInquiries.userId, expiredUserIds));
 
         if (attachments.length > 0) {
-          console.log(`Found ${attachments.length} orphan files to remove from Cloudinary.`);
+          logger.info(`Found ${attachments.length} orphan files to remove from Cloudinary.`);
 
           // Cloudinary API Rate Limit(429) 방지를 위한 배치 처리 (50개 단위)
           const BATCH_SIZE = 50;
@@ -65,9 +66,9 @@ export const schedulerPlugin = new Elysia().use(
                 if (publicId) {
                   try {
                     await cloudinaryService.deleteFile(publicId);
-                    console.log(`Cloudinary Physical File Removed: ${publicId}`);
+                    logger.info(`Cloudinary Physical File Removed: ${publicId}`);
                   } catch (err) {
-                    console.error(`Failed to delete file from Cloudinary (${publicId}):`, err);
+                    logger.error({ err }, `Failed to delete file from Cloudinary (${publicId}):`);
                   }
                 }
               }),
@@ -82,13 +83,13 @@ export const schedulerPlugin = new Elysia().use(
           .where(inArray(userProfiles.userId, expiredUserIds))
           .returning({ id: userProfiles.userId });
 
-        console.log(
+        logger.info(
           `Successfully hard deleted ${deleted.length} database records and synchronized physical storage.`,
         );
       } catch (err) {
-        console.error('CRITICAL: Error during hard deletion sync:', err);
+        logger.error({ err }, 'CRITICAL: Error during hard deletion sync:');
       }
-      console.log('--- End Hard Deleting ---');
+      logger.info('--- End Hard Deleting ---');
     },
   }),
 );

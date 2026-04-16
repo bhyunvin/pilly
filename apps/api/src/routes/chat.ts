@@ -8,6 +8,7 @@ import { streamText, tool, zodSchema } from 'ai';
 import { z } from 'zod';
 import { encrypt } from '../utils/security';
 import { determineAIModel, MODELS, SYSTEM_PROMPTS } from '../utils/ai';
+import { logger } from '../utils/logger';
 
 /**
  * 채팅 히스토리 메시지 텍스트 파트 구조
@@ -259,8 +260,8 @@ export const createChatRoutes = (app: Elysia) => {
             tools: createChatTools(userId),
             onFinish: async ({ text, usage }) => {
               // 토큰 사용량 로깅
-              console.log(`[AI Usage Log] Model: ${selectedModel}`);
-              console.log(
+              logger.info(`[AI Usage Log] Model: ${selectedModel}`);
+              logger.info(
                 `Input Tokens: ${usage.inputTokens}, Output Tokens: ${usage.outputTokens}, Total: ${usage.totalTokens}`,
               );
 

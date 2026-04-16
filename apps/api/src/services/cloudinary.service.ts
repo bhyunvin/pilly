@@ -1,5 +1,6 @@
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import toStream from 'buffer-to-stream';
+import { logger } from '../utils/logger';
 
 /**
  * Cloudinary 파일 업로드 제한 및 설정 상수
@@ -54,7 +55,7 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error) {
-            console.error('Cloudinary upload stream error:', error);
+            logger.error({ err: error }, 'Cloudinary upload stream error:');
             return reject(
               new Error(
                 error instanceof Error
@@ -85,7 +86,7 @@ export class CloudinaryService {
     return new Promise((resolve, reject) => {
       cloudinary.uploader.destroy(publicId, (error, result) => {
         if (error) {
-          console.error(`Failed to delete file from Cloudinary (ID: ${publicId}):`, error);
+          logger.error({ err: error }, `Failed to delete file from Cloudinary (ID: ${publicId}):`);
           return reject(
             new Error(
               error instanceof Error
@@ -120,7 +121,7 @@ export class CloudinaryService {
       const folderPath = parts.slice(uploadIndex + 2).join('/');
       return folderPath ? `${folderPath}/${fileName}` : fileName;
     } catch (err) {
-      console.error('Failed to extract publicId from URL:', err);
+      logger.error({ err }, 'Failed to extract publicId from URL:');
       return null;
     }
   }

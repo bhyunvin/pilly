@@ -13,6 +13,7 @@ import { updatePillDatabase } from '../scripts/syncPills';
 import { eq, desc } from 'drizzle-orm';
 import { sendAccessAlertEmail } from '../utils/mail';
 import { decrypt } from '../utils/security';
+import { logger } from '../utils/logger';
 
 /**
  * 관리자 라우트 생성 팩토리 함수
@@ -40,7 +41,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
           set.status = 401;
           return { success: false, message: 'Unauthorized' };
         }
-        updatePillDatabase().catch(console.error);
+        updatePillDatabase().catch(logger.error);
         return { success: true, message: 'Sync started' };
       },
       {

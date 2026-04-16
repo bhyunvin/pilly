@@ -1,5 +1,6 @@
 import * as jose from 'jose';
 import crypto from 'node:crypto';
+import { logger } from './logger';
 
 const ALGORITHM = 'aes-256-gcm';
 
@@ -64,7 +65,7 @@ export const decrypt = (text: string): string => {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error('Decryption failed', err);
+    logger.error({ err }, 'Decryption failed');
     return text; // 실패 시 원본 문자열 반환 (마이그레이션 대비)
   }
 };

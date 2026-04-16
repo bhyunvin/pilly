@@ -6,6 +6,7 @@ import { eq, desc } from 'drizzle-orm';
 import { google } from '@ai-sdk/google';
 import { generateText, Output, zodSchema } from 'ai';
 import { z } from 'zod';
+import { logger } from '../utils/logger';
 
 /**
  * Vision AI가 이미지에서 추출하는 약물 정보 스키마
@@ -136,7 +137,7 @@ export const createMedicationRoutes = (app: Elysia) => {
 
             return { success: true, data: output.medications };
           } catch (e) {
-            console.error('[Vision AI] 이미지 분석 실패:', e);
+            logger.error({ err: e }, '[Vision AI] 이미지 분석 실패:');
             set.status = 500;
             return {
               success: false,
