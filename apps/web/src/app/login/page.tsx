@@ -147,13 +147,15 @@ export default function LoginPage() {
                         <span className="text-primary font-bold">[필수]</span> 서비스 이용약관 동의
                       </Label>
                       <Dialog>
-                        <DialogTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
-                          >
-                            보기
-                          </button>
+                        <DialogTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
+                            />
+                          }
+                        >
+                          보기
                         </DialogTrigger>
                         <DialogContent className="max-w-xl" showCloseButton>
                           <DialogHeader>
@@ -231,13 +233,15 @@ export default function LoginPage() {
                         동의
                       </Label>
                       <Dialog>
-                        <DialogTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
-                          >
-                            보기
-                          </button>
+                        <DialogTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1"
+                            />
+                          }
+                        >
+                          보기
                         </DialogTrigger>
                         <DialogContent className="max-w-xl" showCloseButton>
                           <DialogHeader>
@@ -279,13 +283,15 @@ export default function LoginPage() {
                         <span>민감정보(건강 및 복약 기록 등) 수집/이용 동의</span>
                       </Label>
                       <Dialog>
-                        <DialogTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1 shrink-0"
-                          >
-                            보기
-                          </button>
+                        <DialogTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2 active:scale-95 transition-all p-1 shrink-0"
+                            />
+                          }
+                        >
+                          보기
                         </DialogTrigger>
                         <DialogContent className="max-w-xl" showCloseButton>
                           <DialogHeader>
