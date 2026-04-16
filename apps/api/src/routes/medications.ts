@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type Context } from 'elysia';
 import { db } from '../db';
 import { userMedications } from '../db/schema';
 import { authPlugin } from '../middleware/auth';
@@ -27,8 +27,8 @@ const analyzeImageSchema = z.object({
 /**
  * 복약 관리 라우트 팩토리 함수
  * @description 사용자의 복약 목록 관리(CRUD) 및 AI 이미지 분석을 통한 복약 정보 자동 추출 기능을 제공합니다.
- * @param {Elysia} app - Elysia 애플리케이션 인스턴스
- * @returns {Elysia} 복약 관리 그룹 라우트가 추가된 인스턴스
+ * @param app - Elysia 애플리케이션 인스턴스
+ * @returns 복약 관리 그룹 라우트가 추가된 인스턴스
  */
 export const createMedicationRoutes = (app: Elysia) => {
   return app.group('/medications', (group) =>
@@ -41,7 +41,7 @@ export const createMedicationRoutes = (app: Elysia) => {
        */
       .get(
         '/',
-        async ({ userId }) => {
+        async ({ userId }: { userId: string }) => {
           return await db
             .select()
             .from(userMedications)
@@ -63,7 +63,15 @@ export const createMedicationRoutes = (app: Elysia) => {
        */
       .post(
         '/',
-        async ({ body, userId, set }) => {
+        async ({
+          body,
+          userId,
+          set,
+        }: {
+          body: { name: string; dosage: string; frequency: string; startDate?: string };
+          userId: string;
+          set: Context['set'];
+        }) => {
           const { name, dosage, frequency, startDate } = body;
           const [med] = await db
             .insert(userMedications)
@@ -100,14 +108,12 @@ export const createMedicationRoutes = (app: Elysia) => {
        * SDK v6의 generateText({ output }) 방식을 사용하여 타입 안전한 파싱을 보장합니다.
        *
        * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {Object} context.body - 요청 본문 (image: File)
-       * @param {Object} context.set - 응답 상태 설정 객체
-       * @returns {Promise<{success: boolean, data: AnalyzeImageResult['medications']}>} 추출된 약물 정보 배열
+       * @param context - 요청 컨텍스트
+       * @returns 추출된 약물 정보 배열
        */
       .post(
         '/analyze-image',
-        async ({ body, set }) => {
+        async ({ body, set }: { body: { image: File }; set: Context['set'] }) => {
           const { image } = body;
           const buffer = Buffer.from(await image.arrayBuffer());
           const base64Image = buffer.toString('base64');

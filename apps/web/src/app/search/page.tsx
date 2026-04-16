@@ -39,7 +39,7 @@ export default function SearchPage() {
    * 설정된 검색 조건(이름, 모양, 색상)에 따라 의약품 정보를 비동기로 검색합니다.
    *
    * @async
-   * @param {React.FormEvent} [e] - 폼 제출 이벤트 객체 (선택사항)
+   * @param e - 폼 제출 이벤트 객체 (선택사항)
    */
   const handleSearch = useCallback(
     async (e?: React.SyntheticEvent) => {

@@ -58,7 +58,7 @@ export default function MedicationsPage() {
    * 사용자가 입력한 새로운 복약 정보를 서버에 비동기로 추가합니다.
    *
    * @async
-   * @param {React.SyntheticEvent} e - 폼 제출 이벤트 객체
+   * @param e - 폼 제출 이벤트 객체
    */
   const handleAdd = async (e: React.SyntheticEvent) => {
     e.preventDefault();

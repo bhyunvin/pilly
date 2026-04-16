@@ -15,9 +15,9 @@ import { ko } from 'date-fns/locale';
  * 계정 복구 페이지 컴포넌트입니다.
  * 탈퇴 유예 기간(30일) 중인 사용자가 자신의 탈퇴 상태를 확인하고 계정을 다시 활성화할 수 있는 기능을 제공합니다.
  *
- * @returns {JSX.Element} 계정 복구 페이지 렌더링 결과
+ * @returns 계정 복구 페이지 렌더링 결과
  */
-export default function RestorePage() {
+export default function RestorePage(): React.ReactNode {
   const router = useRouter();
   const { apiFetch } = useApi();
   const [deletedAt, setDeletedAt] = useState<string | null>(null);
@@ -28,7 +28,6 @@ export default function RestorePage() {
    * 사용자 프로필을 비동기로 조회하여 탈퇴 여부와 정확한 탈퇴 일시를 확인합니다.
    *
    * @async
-   * @function fetchProfile
    */
   const fetchProfile = useCallback(async () => {
     try {

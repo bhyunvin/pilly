@@ -48,8 +48,8 @@ const colors = [
  * @description 의약품의 외형적 특징(모양 및 색상)을 선택하여 검색 필터를 적용하는 컴포넌트입니다.
  * 사용자가 시각적으로 인식한 의약품 정보를 기반으로 검색 범위를 좁힐 때 사용됩니다.
  *
- * @param {VisualFiltersProps} props - 현재 선택된 모양/색상 값 및 변경 콜백 함수
- * @returns {JSX.Element} 모양 및 색상 선택 버튼 목록이 포함된 필터 영역을 반환합니다.
+ * @param props - 현재 선택된 모양/색상 값 및 변경 콜백 함수
+ * @returns 모양 및 색상 선택 버튼 목록이 포함된 필터 영역을 반환합니다.
  */
 export function VisualFilters({
   selectedShape,

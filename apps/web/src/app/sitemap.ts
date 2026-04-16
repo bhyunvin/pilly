@@ -4,7 +4,7 @@ import { MetadataRoute } from 'next';
  * 서비스의 sitemap.xml 설정을 생성합니다.
  * 주요 페이지의 URL, 최종 수정일, 변경 빈도 및 우선순위를 정의합니다.
  *
- * @returns {MetadataRoute.Sitemap} 사이트맵 항목 배열
+ * @returns 사이트맵 항목 배열
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pilly-web.vercel.app';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -26,9 +26,9 @@ import {
  * 각종 약관(이용약관, 개인정보, 민감정보)에 대한 동의를 필수적으로 받습니다.
  * 모든 필수 약관에 동의해야만 로그인 요청이 가능합니다.
  *
- * @returns {JSX.Element} 로그인 페이지 UI
+ * @returns 로그인 페이지 UI
  */
-export default function LoginPage() {
+export default function LoginPage(): React.ReactNode {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -46,9 +46,9 @@ export default function LoginPage() {
    * 입력된 이메일 주소로 로그인용 매직 링크 발송을 비동기로 요청합니다.
    *
    * @async
-   * @param {React.SyntheticEvent<HTMLFormElement>} e - 폼 제출 이벤트 객체
+   * @param e - 폼 제출 이벤트 객체
    */
-  const handleLogin = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!allConsented) return;
     setIsLoading(true);
@@ -76,7 +76,7 @@ export default function LoginPage() {
   /**
    * 모든 약관 동의 체크박스의 상태를 일괄적으로 변경합니다.
    *
-   * @param {boolean} checked - 변경할 체크박스 상태
+   * @param checked - 변경할 체크박스 상태
    */
   const handleAllConsentChange = (checked: boolean) => {
     setConsents({
@@ -90,8 +90,8 @@ export default function LoginPage() {
   /**
    * 개별 약관 동의 상태를 변경하고, 전체 동의 여부를 갱신합니다.
    *
-   * @param {keyof typeof consents} key - 변경할 약관 항목 키
-   * @param {boolean} checked - 변경할 체크박스 상태
+   * @param key - 변경할 약관 항목 키
+   * @param checked - 변경할 체크박스 상태
    */
   const handleSingleConsentChange = (key: keyof typeof consents, checked: boolean) => {
     const newConsents = { ...consents, [key]: checked };

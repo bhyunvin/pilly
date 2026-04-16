@@ -27,8 +27,8 @@ interface ChatInquiryModalProps {
  * @description 채팅 세션과 관련된 1:1 문의를 작성하고 제출하는 모달 컴포넌트입니다.
  * 사용자는 제목, 내용, 첨부파일을 입력할 수 있으며, 관리자에게 해당 채팅 내역에 대한 접근 권한을 부여할지 선택할 수 있습니다.
  *
- * @param {ChatInquiryModalProps} props - 모달 제어 상태 및 세션 ID
- * @returns {JSX.Element} 문의 폼이 포함된 다이얼로그 모달을 반환합니다.
+ * @param props - 모달 제어 상태 및 세션 ID
+ * @returns 문의 폼이 포함된 다이얼로그 모달을 반환합니다.
  */
 export function ChatInquiryModal({
   isOpen,
@@ -47,9 +47,9 @@ export function ChatInquiryModal({
    * 입력된 데이터를 FormData로 구성하여 API로 전송하고, 성공 시 입력 필드를 초기화합니다.
    *
    * @async
-   * @param {React.FormEvent} e - 폼 제출 이벤트
+   * @param e - 폼 제출 이벤트
    */
-  const handleSubmit = async (e: React.SyntheticEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent): Promise<void> => {
     e.preventDefault();
     setIsSubmitting(true);
 

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  * @description 모바일 환경에서 하단에 고정되어 주요 페이지 간 이동을 돕는 내비게이션 바입니다.
  * 홈, 검색, 채팅, 프로필 등 주요 서비스 섹션으로의 링크를 제공하며 현재 활성화된 페이지를 시각적으로 강조합니다.
  *
- * @returns {JSX.Element} 아이콘과 라벨로 구성된 하단 내비게이션 바를 반환합니다.
+ * @returns 아이콘과 라벨로 구성된 하단 내비게이션 바를 반환합니다.
  */
 export function BottomNav() {
   const pathname = usePathname();

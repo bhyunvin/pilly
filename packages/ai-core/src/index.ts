@@ -16,7 +16,7 @@ export class PillyAiCore {
 
   /**
    * PillyAiCore 인스턴스를 생성합니다.
-   * @param {string} apiKey - Google AI SDK API 키
+   * @param apiKey - Google AI SDK API 키
    */
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -32,8 +32,8 @@ export class PillyAiCore {
    * [NOTE]: 복잡한 약물 상호작용 분석이 필요한 경우 google('gemini-3.1-pro')로 교체 검토
    *
    * @async
-   * @param {Medicine} medicine - 가이드를 생성할 대상 약물 정보 객체
-   * @returns {Promise<string>} AI가 생성한 복약 가이드 텍스트
+   * @param medicine - 가이드를 생성할 대상 약물 정보 객체
+   * @returns AI가 생성한 복약 가이드 텍스트
    */
   async getMedicineGuide(medicine: Medicine): Promise<string> {
     const { text } = await generateText({

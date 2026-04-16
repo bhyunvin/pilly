@@ -25,8 +25,8 @@ interface SearchResponse {
  * 의약품 통합 검색 API 라우트를 정의하는 그룹
  * @description 식약처 데이터를 기반으로 이름, 제형, 색상 필터링 검색을 수행합니다.
  *
- * @param {Elysia} app - Elysia 애플리케이션 인스턴스
- * @returns {Elysia} 검색 그룹 라우트가 추가된 인스턴스
+ * @param app - Elysia 애플리케이션 인스턴스
+ * @returns 검색 그룹 라우트가 추가된 인스턴스
  */
 export const createSearchRoutes = (app: Elysia) => {
   return app.group('/search', (group) =>
@@ -36,13 +36,16 @@ export const createSearchRoutes = (app: Elysia) => {
        * 의약품 카탈로그 조건 검색
        * @description 쿼리 파라미터(이름, 모양, 색상)로 전달된 조건에 따라 의약품 목록을 최대 50개까지 조회합니다.
        * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {Object} context.query - 쿼리 스트링 (name, shape, color)
-       * @returns {Promise<SearchResponse>} 검색 결과 객체
+       * @param context - 요청 컨텍스트
+       * @returns 검색 결과 객체
        */
       .get(
         '/',
-        async ({ query }): Promise<SearchResponse> => {
+        async ({
+          query,
+        }: {
+          query: { name?: string; shape?: string; color?: string };
+        }): Promise<SearchResponse> => {
           const { name, shape, color } = query;
 
           const filters = [];

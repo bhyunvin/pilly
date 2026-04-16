@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth';
@@ -20,9 +20,9 @@ import { Label } from '@/components/ui/label';
  * 초기 프로필 설정 페이지 컴포넌트입니다.
  * 회원가입 직후 사용자가 서비스에서 사용할 닉네임을 설정하는 기능을 제공합니다.
  *
- * @returns {JSX.Element} 프로필 설정 페이지 렌더링 결과
+ * @returns 프로필 설정 페이지 렌더링 결과
  */
-export default function ProfileSetupPage() {
+export default function ProfileSetupPage(): React.ReactNode {
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,9 +32,9 @@ export default function ProfileSetupPage() {
    * 입력한 닉네임을 서버에 저장하여 프로필 설정을 완료합니다.
    *
    * @async
-   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
+   * @param e - 폼 제출 이벤트 객체
    */
-  const handleSetup = async (e: React.SyntheticEvent) => {
+  const handleSetup = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');

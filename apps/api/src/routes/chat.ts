@@ -37,7 +37,7 @@ interface ChatHistoryItem {
  * 사용자가 특정 의도(약물 검색, 복약 목록 조회, 복약 알림 설정)를 표현할 때
  * Gemini 모델이 자동으로 해당 tool을 호출합니다.
  *
- * @param {string} userId - 현재 인증된 사용자 ID (복약 데이터 조회에 사용)
+ * @param userId - 현재 인증된 사용자 ID (복약 데이터 조회에 사용)
  */
 const createChatTools = (userId: string) => ({
   /**
@@ -52,7 +52,7 @@ const createChatTools = (userId: string) => ({
         keyword: z.string().describe('검색할 약물명 또는 키워드'),
       }),
     ),
-    execute: async ({ keyword }) => {
+    execute: async ({ keyword }: { keyword: string }) => {
       const results = await db
         .select({
           itemName: pillCatalog.itemName,
@@ -118,7 +118,15 @@ const createChatTools = (userId: string) => ({
         frequency: z.string().describe('복용 빈도 (예: 하루 3회, 매일 등)'),
       }),
     ),
-    execute: async ({ medicationName, time, frequency }) => {
+    execute: async ({
+      medicationName,
+      time,
+      frequency,
+    }: {
+      medicationName: string;
+      time: string;
+      frequency: string;
+    }) => {
       // 실제 스케줄러/푸시 알림 연동은 클라이언트 또는 별도 서비스에서 처리
       return {
         success: true,
@@ -135,8 +143,8 @@ const createChatTools = (userId: string) => ({
  * Function Calling(tools)을 통해 약물 검색, 복약 목록 조회, 알림 설정 의도를 처리합니다.
  * 보안을 위해 대화 내역은 암호화되어 저장됩니다.
  *
- * @param {Elysia} app - Elysia 애플리케이션 인스턴스
- * @returns {Elysia} 채팅 그룹 라우트가 추가된 인스턴스
+ * @param app - Elysia 애플리케이션 인스턴스
+ * @returns 채팅 그룹 라우트가 추가된 인스턴스
  */
 export const createChatRoutes = (app: Elysia) => {
   return app.group('/chat', (group) =>
@@ -146,13 +154,12 @@ export const createChatRoutes = (app: Elysia) => {
        * 사용자의 활성화된 모든 채팅 세션 목록 조회
        * @description 현재 로그인한 사용자의 모든 과거 상담 내역 세션을 최신순으로 가져옵니다.
        * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {string} context.userId - 인증된 사용자 ID
-       * @returns {Promise<Array<Object>>} 채팅 세션 리스트
+       * @param context - 요청 컨텍스트
+       * @returns 채팅 세션 리스트
        */
       .get(
         '/sessions',
-        async ({ userId }) => {
+        async ({ userId }: { userId: string }) => {
           return await db
             .select()
             .from(chatSessions)
@@ -172,14 +179,12 @@ export const createChatRoutes = (app: Elysia) => {
        * 새로운 채팅 상담 세션 생성
        * @description AI와의 대화를 시작하기 위한 새로운 방(세션)을 생성합니다.
        * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {string} context.userId - 인증된 사용자 ID
-       * @param {Object} context.body - 요청 본문 (title)
-       * @returns {Promise<{success: boolean, data: Object}>} 생성된 세션 정보
+       * @param context - 요청 컨텍스트
+       * @returns 생성된 세션 정보
        */
       .post(
         '/sessions',
-        async ({ userId, body }) => {
+        async ({ userId, body }: { userId: string; body: { title?: string } }) => {
           const [newSession] = await db
             .insert(chatSessions)
             .values({
@@ -213,17 +218,22 @@ export const createChatRoutes = (app: Elysia) => {
        * [NOTE]: 고도의 추론이 필요한 경우 google('gemini-3.1-pro')로 교체 검토
        *
        * @async
-       * @param {Object} context - 요청 컨텍스트
-       * @param {Object} context.params - 경로 파라미터 (id)
-       * @param {Object} context.body - 요청 본문 (history)
-       * @param {string} context.userId - 인증된 사용자 ID
-       * @returns {Promise<Response>} AI 응답 스트림
+       * @param context - 요청 컨텍스트
+       * @returns AI 응답 스트림
        */
       .post(
         '/sessions/:id/message',
-        async ({ params, body, userId }) => {
+        async ({
+          params,
+          body,
+          userId,
+        }: {
+          params: { id: number };
+          body: { history: ChatHistoryItem[] };
+          userId: string;
+        }) => {
           const sessionId = params.id;
-          const { history } = body as { history: ChatHistoryItem[] };
+          const { history } = body;
 
           // 전송된 히스토리 중 마지막 사용자 프롬프트 추출
           const lastUserMessage = [...history].reverse().find((msg) => msg.role === 'user');

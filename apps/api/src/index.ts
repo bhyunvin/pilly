@@ -39,9 +39,9 @@ const app = new Elysia()
    * 애플리케이션 내부에서 발생하는 모든 에러를 포착하여 정제된 응답을 반환합니다.
    * 보안을 위해 구체적인 서버 내부 오류 정보는 노출하지 않고 로그에만 기록합니다.
    *
-   * @param {string} code - 에러 코드 (예: 'NOT_FOUND', 'VALIDATION')
-   * @param {Error} error - 발생한 에러 객체
-   * @param {Function} set - 응답 상태 코드 설정을 위한 객체
+   * @param code - 에러 코드 (예: 'NOT_FOUND', 'VALIDATION')
+   * @param error - 발생한 에러 객체
+   * @param set - 응답 상태 코드 설정을 위한 객체
    */
   .onError(({ code, error, set }) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

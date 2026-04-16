@@ -1,5 +1,5 @@
 import { ERROR_MESSAGES, USER_ROLE, USER_STATUS, ACCESS_EXPIRATION_TIME } from '../utils/constants';
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type Context } from 'elysia';
 import { db } from '../db';
 import {
   chatAccessApprovals,
@@ -18,8 +18,8 @@ import { logger } from '../utils/logger';
 /**
  * 관리자 라우트 생성 팩토리 함수
  * @description 시스템 관리자를 위한 사용자 관리, 제재 처리, 채팅 로그 모니터링 기능을 제공합니다.
- * @param {typeof authPlugin} [auth=authPlugin] - 인증 처리를 위한 플러그인
- * @returns {Elysia} 관리자 전용 엔드포인트가 설정된 Elysia 인스턴스
+ * @param auth - 인증 처리를 위한 플러그인
+ * @returns 관리자 전용 엔드포인트가 설정된 Elysia 인스턴스
  */
 export const createAdminRoutes = (auth = authPlugin) =>
   new Elysia({ prefix: '/admin' })
@@ -27,14 +27,18 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 의약품 데이터 동기화 엔드포인트
      * @description 외부 API를 통해 최신 의약품 정보를 데이터베이스에 갱신합니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {Object} context.headers - 요청 헤더 (x-admin-key 필요)
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @returns {Promise<{success: boolean, message: string}>} 처리 결과 메시지
+     * @param context - 요청 컨텍스트
+     * @returns 처리 결과 메시지
      */
     .post(
       '/sync-pills',
-      async ({ headers, set }) => {
+      async ({
+        headers,
+        set,
+      }: {
+        headers: Record<string, string | undefined>;
+        set: Context['set'];
+      }) => {
         const adminKey = process.env.ADMIN_API_KEY;
         const clientKey = headers['x-admin-key'];
         if (!adminKey || clientKey !== adminKey) {
@@ -58,13 +62,11 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 관리자 권한 검증 미들웨어
      * @description 로그인된 사용자의 프로필을 조회하여 ADMIN 역할인지 확인합니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {string} context.userId - 인증 플러그인에서 제공된 사용자 ID
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @returns {Promise<{isAdmin: boolean}>} 관리자 여부 확인 객체
+     * @param context - 요청 컨텍스트
+     * @returns 관리자 여부 확인 객체
      * @throws {Error} 인증되지 않았거나 관리자가 아닐 경우 401/403 에러 발생
      */
-    .derive(async ({ userId, set }) => {
+    .derive(async ({ userId, set }: { userId: string; set: Context['set'] }) => {
       if (!userId) {
         set.status = 401;
         throw new Error('Unauthorized');
@@ -87,7 +89,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 전체 사용자 목록 조회
      * @description 시스템의 모든 사용자 프로필 목록을 최신 가입 순으로 조회합니다.
      * @async
-     * @returns {Promise<{success: boolean, users: Array<Object>}>} 사용자 목록
+     * @returns 사용자 목록
      */
     .get(
       '/users',
@@ -116,7 +118,7 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 탈퇴 대기 사용자 목록 조회
      * @description 회원 탈퇴를 신청하여 30일 유예 기간 중인 사용자들을 조회합니다.
      * @async
-     * @returns {Promise<{success: boolean, withdrawals: Array<Object>}>} 탈퇴 대기 목록
+     * @returns 탈퇴 대기 목록
      */
     .get(
       '/withdrawals',
@@ -143,14 +145,12 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 특정 사용자 상세 정보 조회
      * @description 사용자의 프로필과 함께 과거 제재 이력을 포함하여 상세 정보를 조회합니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {Object} context.params - 경로 파라미터 (userId)
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @returns {Promise<{success: boolean, user: Object} | {success: false, message: string}>} 사용자 상세 데이터
+     * @param context - 요청 컨텍스트
+     * @returns 사용자 상세 데이터
      */
     .get(
       '/users/:userId',
-      async ({ params, set }) => {
+      async ({ params, set }: { params: { userId: string }; set: Context['set'] }) => {
         const userProfileDetail = await db.query.userProfiles.findFirst({
           where: eq(userProfiles.userId, params.userId),
           with: {
@@ -181,14 +181,12 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 사용자 권한 변경 (Toggle)
      * @description 사용자의 역할을 USER와 ADMIN 사이에서 전환합니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {Object} context.params - 경로 파라미터 (userId)
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @returns {Promise<{success: boolean, role: string} | {success: false, message: string}>} 업데이트된 역할
+     * @param context - 요청 컨텍스트
+     * @returns 업데이트된 역할
      */
     .patch(
       '/users/:userId/role',
-      async ({ params, set }) => {
+      async ({ params, set }: { params: { userId: string }; set: Context['set'] }) => {
         const profile = await db
           .select()
           .from(userProfiles)
@@ -221,16 +219,22 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * 사용자 계정 상태 변경 (제재/활성화)
      * @description 사용자를 제재하거나 다시 활성화하며, 제재 시 이력을 남깁니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {Object} context.params - 경로 파라미터 (userId)
-     * @param {Object} context.body - 요청 본문 (status, reason)
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @param {string} context.userId - 처리를 수행하는 관리자 ID
-     * @returns {Promise<{success: boolean, message: string}>} 결과 메시지
+     * @param context - 요청 컨텍스트
+     * @returns 결과 메시지
      */
     .patch(
       '/users/:userId/status',
-      async ({ params, body, set, userId: currentAdminId }) => {
+      async ({
+        params,
+        body,
+        set,
+        userId: currentAdminId,
+      }: {
+        params: { userId: string };
+        body: { status: string; reason?: string };
+        set: Context['set'];
+        userId: string;
+      }) => {
         const { status, reason } = body;
         const profile = await db
           .select()
@@ -299,14 +303,12 @@ export const createAdminRoutes = (auth = authPlugin) =>
      * @description 사용자 동의가 포함된 문의와 연관된 채팅 로그에 대해 관리자의 일시적인 접근을 허용합니다.
      * 보안을 위해 최초 접근 시 열람 유효 기간(24시간)이 설정되며 사용자에게 알림이 전송됩니다.
      * @async
-     * @param {Object} context - 요청 컨텍스트
-     * @param {Object} context.params - 경로 파라미터 (sessionId)
-     * @param {Object} context.set - 응답 상태 설정 객체
-     * @returns {Promise<{success: boolean, logs: Array<Object>} | {success: false, message: string}>} 복호화된 채팅 로그 목록
+     * @param context - 요청 컨텍스트
+     * @returns 복호화된 채팅 로그 목록
      */
     .get(
       '/chat/:sessionId',
-      async ({ params, set }) => {
+      async ({ params, set }: { params: { sessionId: string }; set: Context['set'] }) => {
         const sessionId = Number.parseInt(params.sessionId);
         const approvals = await db
           .select()
@@ -376,6 +378,6 @@ export const createAdminRoutes = (auth = authPlugin) =>
 
 /**
  * 기본 관리자 라우트 인스턴스
- * @constant {Elysia}
+ * @constant
  */
 export const adminRoutes = createAdminRoutes();

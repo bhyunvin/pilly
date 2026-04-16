@@ -5,8 +5,8 @@ import { logger } from '@/utils/logger';
  * @description 텍스트에서 마크다운 링크 형식을 제거하고 텍스트 본문만 추출하는 헬퍼 함수입니다.
  * TTS 출력 시 URL이나 마크다운 문법이 그대로 읽히는 것을 방지합니다.
  *
- * @param {string} text - 변환할 원본 텍스트
- * @returns {string} 링크가 제거된 순수 텍스트
+ * @param text - 변환할 원본 텍스트
+ * @returns 링크가 제거된 순수 텍스트
  */
 const stripLinks = (text: string): string => {
   let result = text;
@@ -28,8 +28,8 @@ const stripLinks = (text: string): string => {
  * @description 텍스트에서 HTML 태그를 제거하는 헬퍼 함수입니다.
  * TTS 엔진이 태그 문자열을 읽지 않도록 정제합니다.
  *
- * @param {string} text - 태그가 포함된 텍스트
- * @returns {string} HTML 태그가 제거된 텍스트
+ * @param text - 태그가 포함된 텍스트
+ * @returns HTML 태그가 제거된 텍스트
  */
 const stripHtml = (text: string): string => {
   let result = text;
@@ -49,8 +49,8 @@ const stripHtml = (text: string): string => {
  * @description 괄호( (), [] )와 그 내부 콘텐츠를 제거하는 헬퍼 함수입니다.
  * 약물 명칭 등에서 부가 정보를 생략하고 핵심 명칭 위주로 읽어주기 위해 사용됩니다.
  *
- * @param {string} text - 변환할 원본 텍스트
- * @returns {string} 괄호와 내용이 제거된 텍스트
+ * @param text - 변환할 원본 텍스트
+ * @returns 괄호와 내용이 제거된 텍스트
  */
 const stripBrackets = (text: string): string => {
   let result = text;
@@ -70,17 +70,24 @@ const stripBrackets = (text: string): string => {
   return result;
 };
 
+interface UseTTSReturn {
+  /** 텍스트 음성 출력 함수 */
+  speak: (text: string) => void;
+  /** 음성 중단 함수 */
+  stopSpeaking: () => void;
+  /** 현재 음성 출력 중 여부 */
+  isSpeaking: boolean;
+  /** 브라우저의 TTS 지원 여부 */
+  ttsSupported: boolean;
+}
+
 /**
  * @description 브라우저의 Web Speech API(SpeechSynthesis)를 활용하여 텍스트를 음성으로 변환하는 커스텀 훅입니다.
  * AI의 상담 내용을 사용자에게 읽어주는 시나리오에서 사용되며, 마크다운/HTML 정제 및 문장 분할 재생 로직을 포함합니다.
  *
- * @returns {Object} TTS 조작 함수 및 상태
- * @returns {Function} returns.speak - 텍스트 음성 출력 함수
- * @returns {Function} returns.stopSpeaking - 음성 중단 함수
- * @returns {boolean} returns.isSpeaking - 현재 음성 출력 중 여부
- * @returns {boolean} returns.ttsSupported - 브라우저의 TTS 지원 여부
+ * @returns TTS 조작 함수 및 상태
  */
-export const useTTS = () => {
+export const useTTS = (): UseTTSReturn => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [ttsSupported, setTtsSupported] = useState(false);
@@ -111,8 +118,8 @@ export const useTTS = () => {
    * @description TTS 출력을 위해 텍스트를 정제합니다.
    * 마크다운 기호, HTML, 괄호 내용 및 이모지를 제거하여 자연스러운 음성 합성을 지원합니다.
    *
-   * @param {string} text - 정제할 원본 텍스트
-   * @returns {string} 정제된 순수 텍스트
+   * @param text - 정제할 원본 텍스트
+   * @returns 정제된 순수 텍스트
    */
   const stripForTts = useCallback((text: string): string => {
     if (!text) return '';
@@ -136,7 +143,7 @@ export const useTTS = () => {
   /**
    * @description 현재 재생 중인 모든 음성을 즉시 중단하고 상태를 초기화합니다.
    */
-  const stopSpeaking = useCallback(() => {
+  const stopSpeaking = useCallback((): void => {
     if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
       globalThis.speechSynthesis.cancel();
       activeUtterances.current.length = 0;
@@ -148,10 +155,10 @@ export const useTTS = () => {
    * @description 전달된 텍스트를 정제한 후, 문장 단위로 나누어 음성으로 출력합니다.
    * 한국어(ko-KR) 음성을 우선적으로 선택하여 재생합니다.
    *
-   * @param {string} text - 음성으로 출력할 원본 텍스트
+   * @param text - 음성으로 출력할 원본 텍스트
    */
   const speak = useCallback(
-    (text: string) => {
+    (text: string): void => {
       if (!ttsSupported || !text) return;
 
       stopSpeaking();

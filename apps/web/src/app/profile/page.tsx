@@ -32,9 +32,9 @@ import { AlertCircle, User, LogOut } from 'lucide-react';
  * 마이페이지 컴포넌트입니다.
  * 사용자 프로필 정보 조회, 닉네임 수정, 회원 탈퇴 기능을 제공합니다.
  *
- * @returns {JSX.Element} 마이페이지 렌더링 결과
+ * @returns 마이페이지 렌더링 결과
  */
-export default function ProfilePage() {
+export default function ProfilePage(): React.ReactNode {
   const router = useRouter();
   const { apiFetch } = useApi();
 

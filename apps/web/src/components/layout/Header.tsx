@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
  * 서비스 로고, 모바일 메뉴 트리거, 사용자 프로필 이동 버튼을 포함하며, 화면 상단에 고정되어 상시 노출됩니다.
  * 하이드레이션 오류 방지를 위해 클라이언트 마운트 이후에 렌더링을 시작합니다.
  *
- * @returns {JSX.Element | null} 마운트 완료 시 헤더 요소를 반환하며, 초기 렌더링 시에는 null을 반환합니다.
+ * @returns 마운트 완료 시 헤더 요소를 반환하며, 초기 렌더링 시에는 null을 반환합니다.
  */
 export function Header() {
   const pathname = usePathname();

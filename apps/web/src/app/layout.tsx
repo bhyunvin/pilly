@@ -109,10 +109,14 @@ export const metadata: Metadata = {
  * 애플리케이션의 루트 레이아웃 컴포넌트입니다.
  * 폰트, 테마, 글로벌 셸, 분석 도구 등을 설정합니다.
  *
- * @param {Object} props - 컴포넌트 프롭스
- * @param {React.ReactNode} props.children - 하위 페이지 컴포넌트
+ * @param props - 컴포넌트 프롭스
+ * @param props.children - 하위 페이지 컴포넌트
  */
-export default function RootLayout({ children }: { readonly children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  readonly children: React.ReactNode;
+}): React.ReactNode {
   return (
     <html lang="ko" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
       <head>

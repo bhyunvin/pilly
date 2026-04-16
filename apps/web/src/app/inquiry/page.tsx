@@ -22,9 +22,9 @@ import { MessageSquare, CheckCircle2, Loader2 } from 'lucide-react';
  * 1:1 문의 페이지 컴포넌트입니다.
  * 사용자가 서비스 이용 관련 문의사항을 작성하고 관리자에게 제출할 수 있는 기능을 제공합니다.
  *
- * @returns {JSX.Element} 1:1 문의 페이지 렌더링 결과
+ * @returns 1:1 문의 페이지 렌더링 결과
  */
-export default function InquiryPage() {
+export default function InquiryPage(): React.ReactNode {
   const { apiFetch } = useApi();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');

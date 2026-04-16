@@ -6,7 +6,7 @@ const ALGORITHM = 'aes-256-gcm';
 
 /**
  * 환경 변수에서 암호화 키를 가져옵니다.
- * @returns {Buffer} 16진수 문자열에서 변환된 Buffer 형태의 암호화 키
+ * @returns 16진수 문자열에서 변환된 Buffer 형태의 암호화 키
  * @throws {Error} ENCRYPTION_KEY가 정의되지 않은 경우 에러를 발생시킵니다.
  */
 const getEncryptionKey = (): Buffer => {
@@ -24,8 +24,8 @@ const getEncryptionKey = (): Buffer => {
  * 보안을 위해 매 암호화마다 무작위 IV(Initialization Vector)를 생성하며,
  * 결과값은 'IV:AuthTag:EncryptedText' 형식의 문자열로 반환됩니다.
  *
- * @param {string} text - 암호화할 원문 텍스트
- * @returns {string} 암호화된 문자열
+ * @param text - 암호화할 원문 텍스트
+ * @returns 암호화된 문자열
  */
 export const encrypt = (text: string): string => {
   if (!text) return text;
@@ -45,8 +45,8 @@ export const encrypt = (text: string): string => {
  * 입력받은 문자열을 IV, AuthTag, 암호문으로 분리하여 복호화를 수행합니다.
  * 복호화 실패 시 로그를 남기고 원본 문자열을 반환합니다.
  *
- * @param {string} text - 복호화할 암호화된 문자열 (포맷: IV:AuthTag:EncryptedText)
- * @returns {string} 복호화된 원문 텍스트
+ * @param text - 복호화할 암호화된 문자열 (포맷: IV:AuthTag:EncryptedText)
+ * @returns 복호화된 원문 텍스트
  */
 export const decrypt = (text: string): string => {
   if (!text) return text;
@@ -77,8 +77,8 @@ export const decrypt = (text: string): string => {
  * HS256 알고리즘을 사용하여 서명하며, 만료 시간은 2시간으로 설정됩니다.
  *
  * @async
- * @param {Record<string, unknown>} payload - 토큰에 포함할 데이터
- * @returns {Promise<string>} 생성된 JWT 토큰 문자열
+ * @param payload - 토큰에 포함할 데이터
+ * @returns 생성된 JWT 토큰 문자열
  */
 export const generateToken = async (payload: Record<string, unknown>) => {
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
@@ -93,8 +93,8 @@ export const generateToken = async (payload: Record<string, unknown>) => {
  * JWT 토큰의 유효성을 검증하고 페이로드를 반환합니다.
  *
  * @async
- * @param {string} token - 검증할 JWT 토큰
- * @returns {Promise<jose.JWTPayload>} 검증된 토큰의 페이로드
+ * @param token - 검증할 JWT 토큰
+ * @returns 검증된 토큰의 페이로드
  * @throws {Error} 토큰이 유효하지 않은 경우 에러를 발생시킵니다.
  */
 export const verifyToken = async (token: string) => {

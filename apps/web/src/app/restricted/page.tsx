@@ -18,16 +18,15 @@ interface RestrictionInfo {
  * 이용 제한 안내 페이지 컴포넌트입니다.
  * 운영 정책에 따라 서비스 이용이 제한된 사용자에게 제한 사유와 일시를 안내합니다.
  *
- * @returns {JSX.Element} 이용 제한 안내 페이지 렌더링 결과
+ * @returns 이용 제한 안내 페이지 렌더링 결과
  */
-export default function RestrictedPage() {
+export default function RestrictedPage(): React.ReactNode {
   const [restrictionInfo, setRestrictionInfo] = useState<RestrictionInfo | null>(null);
 
   /**
    * 서버로부터 사용자의 현재 이용 제한 정보를 비동기로 조회합니다.
    *
    * @async
-   * @function fetchRestrictionInfo
    */
   const fetchRestrictionInfo = useCallback(async () => {
     try {
@@ -54,7 +53,6 @@ export default function RestrictedPage() {
    * 로그아웃을 처리하고 로그인 페이지로 이동합니다.
    *
    * @async
-   * @function handleLogout
    */
   const handleLogout = async () => {
     await authClient.signOut();

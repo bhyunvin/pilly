@@ -18,9 +18,9 @@ interface ChatSession {
  * AI 복약 상담 세션 목록 페이지 컴포넌트입니다.
  * 사용자의 과거 상담 기록을 조회하고 새로운 상담 세션을 시작할 수 있는 기능을 제공합니다.
  *
- * @returns {JSX.Element} 채팅 세션 목록 페이지 렌더링 결과
+ * @returns 채팅 세션 목록 페이지 렌더링 결과
  */
-export default function ChatSessionsPage() {
+export default function ChatSessionsPage(): React.ReactNode {
   const router = useRouter();
   const { apiFetch } = useApi();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -31,7 +31,6 @@ export default function ChatSessionsPage() {
    * 서버로부터 사용자의 모든 채팅 세션 목록을 비동기로 가져옵니다.
    *
    * @async
-   * @function fetchSessions
    */
   const fetchSessions = useCallback(async () => {
     try {

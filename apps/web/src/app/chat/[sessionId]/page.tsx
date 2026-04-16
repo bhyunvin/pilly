@@ -66,9 +66,9 @@ interface AnalyzedMed {
  * 음성 합성(TTS) 기능을 통해 답변을 읽어줍니다. 또한 약물 사진 분석 기능을 통해
  * 처방전이나 약봉투 이미지를 분석하여 복약 정보를 자동으로 등록할 수 있습니다.
  *
- * @returns {JSX.Element} 채팅 세션 페이지 UI
+ * @returns 채팅 세션 페이지 UI
  */
-export default function ChatSessionPage() {
+export default function ChatSessionPage(): React.ReactNode {
   const params = useParams();
   const router = useRouter();
   const { apiFetch } = useApi();
@@ -154,7 +154,7 @@ export default function ChatSessionPage() {
   /**
    * 주어진 텍스트를 한국어 음성으로 출력합니다.
    *
-   * @param {string} text - 음성으로 출력할 텍스트
+   * @param text - 음성으로 출력할 텍스트
    */
   const speak = (text: string) => {
     if (!ttsEnabled || !synth.current) return;
@@ -168,7 +168,7 @@ export default function ChatSessionPage() {
    * 사용자 메시지를 서버로 전송하고 AI의 답변을 스트리밍 방식으로 수신합니다.
    *
    * @async
-   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
+   * @param e - 폼 제출 이벤트 객체
    */
   const handleSend = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -232,7 +232,7 @@ export default function ChatSessionPage() {
    * 업로드된 사진(처방전 등)을 AI Vision API를 통해 분석 요청합니다.
    *
    * @async
-   * @param {React.ChangeEvent<HTMLInputElement>} e - 파일 입력 변경 이벤트 객체
+   * @param e - 파일 입력 변경 이벤트 객체
    */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -298,10 +298,10 @@ export default function ChatSessionPage() {
   /**
    * 메시지 내용을 렌더링합니다. AI 답변인 경우 마크다운 형식을 파싱합니다.
    *
-   * @param {Message} msg - 렌더링할 메시지 객체
-   * @returns {JSX.Element | string} 렌더링된 메시지 내용
+   * @param msg - 렌더링할 메시지 객체
+   * @returns 렌더링된 메시지 내용
    */
-  const renderContent = (msg: Message) => {
+  const renderContent = (msg: Message): React.ReactNode => {
     if (msg.role === 'ai') {
       const html = DOMPurify.sanitize(marked.parse(msg.content) as string);
       return (

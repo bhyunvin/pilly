@@ -11,9 +11,9 @@ import Link from 'next/link';
  * 서비스의 주요 특징(AI 상담, 의약품 검색, 개인화 관리 등)을 소개하고 각 기능으로의 진입점을 제공합니다.
  *
  * @description 로그인 여부에 따라 미들웨어에서 접근이 제한될 수 있습니다.
- * @returns {JSX.Element} 메인 페이지 렌더링 결과
+ * @returns 메인 페이지 렌더링 결과
  */
-export default function Home() {
+export default function Home(): React.ReactNode {
   const [mounted, setMounted] = useState(false);
 
   // 클라이언트 사이드 마운트 확인 (Hydration 안정성 확보)

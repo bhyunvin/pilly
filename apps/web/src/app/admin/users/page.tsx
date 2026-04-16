@@ -49,9 +49,9 @@ interface UserProfile {
  * 관리자용 사용자 관리 페이지 컴포넌트입니다.
  * 전체 사용자 목록 조회, 상세 정보 확인, 권한 변경 및 이용 제한 등의 관리 기능을 수행합니다.
  *
- * @returns {JSX.Element} 사용자 관리 페이지 렌더링 결과
+ * @returns 사용자 관리 페이지 렌더링 결과
  */
-export default function AdminUsersPage() {
+export default function AdminUsersPage(): React.ReactNode {
   const { apiFetch } = useApi();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -63,7 +63,6 @@ export default function AdminUsersPage() {
    * 서버로부터 전체 사용자 목록을 비동기로 가져옵니다.
    *
    * @async
-   * @function fetchUsers
    */
   const fetchUsers = useCallback(async () => {
     try {
@@ -84,7 +83,7 @@ export default function AdminUsersPage() {
    * 특정 사용자의 상세 정보와 제재 이력을 비동기로 가져옵니다.
    *
    * @async
-   * @param {string} userId - 상세 정보를 조회할 사용자의 고유 ID
+   * @param userId - 상세 정보를 조회할 사용자의 고유 ID
    */
   const fetchUserDetails = async (userId: string) => {
     try {
@@ -103,7 +102,7 @@ export default function AdminUsersPage() {
    * 사용자의 권한(USER/ADMIN)을 비동기로 전환합니다.
    *
    * @async
-   * @param {string} userId - 권한을 변경할 사용자의 고유 ID
+   * @param userId - 권한을 변경할 사용자의 고유 ID
    */
   const toggleRole = async (userId: string) => {
     try {
@@ -129,7 +128,7 @@ export default function AdminUsersPage() {
    * 특정 사용자의 서비스 이용을 비동기로 제한(정지)합니다.
    *
    * @async
-   * @param {string} userId - 이용을 제한할 사용자의 고유 ID
+   * @param userId - 이용을 제한할 사용자의 고유 ID
    */
   const restrictUser = async (userId: string) => {
     try {
@@ -155,7 +154,7 @@ export default function AdminUsersPage() {
    * 이용이 제한된 사용자의 계정을 비동기로 다시 활성화합니다.
    *
    * @async
-   * @param {string} userId - 활성화할 사용자의 고유 ID
+   * @param userId - 활성화할 사용자의 고유 ID
    */
   const activateUser = async (userId: string) => {
     try {

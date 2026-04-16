@@ -48,7 +48,7 @@ interface PillApiResponse {
  * API 서버의 부하를 줄이기 위해 각 요청 사이에 100ms의 지연 시간을 둡니다.
  *
  * @async
- * @returns {Promise<void>}
+ * @returns
  * @throws {Error} API 요청 실패 또는 DB 작업 중 오류 발생 시 에러를 던집니다.
  */
 export async function updatePillDatabase() {

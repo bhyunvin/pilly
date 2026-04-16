@@ -24,9 +24,9 @@ const transporter = nodemailer.createTransport({
  * 이 기능은 투명한 관리 정책을 유지하고 사용자의 프라이버시를 보호하기 위한 목적으로 사용됩니다.
  *
  * @async
- * @param {string} userEmail - 알림을 받을 사용자의 이메일 주소
- * @param {number} sessionId - 관리자가 접근한 채팅 세션의 ID
- * @returns {Promise<void>}
+ * @param userEmail - 알림을 받을 사용자의 이메일 주소
+ * @param sessionId - 관리자가 접근한 채팅 세션의 ID
+ * @returns
  */
 export const sendAccessAlertEmail = async (userEmail: string, sessionId: number) => {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
