@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Pill, User } from 'lucide-react';
+import { Menu, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 /**
  * @description 애플리케이션의 전역 상단 헤더 컴포넌트입니다.
@@ -30,35 +31,30 @@ export function Header() {
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95">
+      <div className="flex h-16 items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-2 md:hidden">
           <Button variant="ghost" size="icon" aria-label="메뉴 열기">
             <Menu className="h-6 w-6" />
           </Button>
         </div>
 
-        <Link
-          href="/"
-          className="flex items-center gap-2 font-bold text-xl text-green-800 dark:text-green-400"
-        >
-          <Pill className="h-6 w-6 rotate-45" aria-hidden="true" />
-          <span className="hidden sm:inline-block">Pilly</span>
-        </Link>
+        <div className="flex-1" />
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {!isAuthPage && (
             <Link href="/profile">
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full"
+                className="rounded-full w-10 h-10"
                 aria-label="프로필 페이지로 이동"
               >
-                <User className="h-5 w-5" />
+                <User className="h-6 w-6" />
               </Button>
             </Link>
           )}
+          <ThemeToggle />
         </div>
       </div>
     </header>

@@ -70,15 +70,27 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     checkRestriction();
   }, [pathname, router]);
 
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+
+  if (isAuthPage) {
+    return (
+      <div className="h-screen w-full overflow-hidden bg-background">
+        <main className="h-full w-full overflow-y-auto">{children}</main>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative min-h-screen flex flex-row bg-background">
-      <aside className="sticky top-0 h-screen w-64 border-r hidden md:block overflow-y-auto z-40 shrink-0">
+    <div className="relative h-screen flex flex-row bg-background overflow-hidden">
+      <aside className="sticky top-0 h-full w-64 border-r hidden md:block overflow-y-auto z-40 shrink-0">
         <Sidebar />
       </aside>
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         <Header />
-        <main className="flex-1 pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 transition-all duration-300 flex flex-col">
-          <div className="flex-1 mx-auto w-full max-w-7xl p-4 md:p-8">{children}</div>
+        <main className="flex-1 overflow-y-auto flex flex-col w-full min-h-0">
+          <div className="flex-1 flex flex-col mx-auto w-full max-w-7xl p-4 md:p-8">
+            <div className="flex-1 flex flex-col w-full">{children}</div>
+          </div>
           <Footer />
         </main>
         <BottomNav />

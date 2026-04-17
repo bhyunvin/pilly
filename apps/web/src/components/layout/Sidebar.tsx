@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 import { authClient } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ThemeToggle } from '@/components/theme-toggle';
 
 interface ChatSession {
   id: number;
@@ -151,7 +150,7 @@ export function Sidebar() {
 
   return (
     <aside className="h-full w-full bg-background flex flex-col">
-      <div className="flex h-16 items-center justify-between px-8 border-b shrink-0">
+      <div className="flex h-16 items-center justify-between pl-6 pr-4 border-b shrink-0">
         <Link
           href="/"
           className="flex items-center gap-2 font-bold text-xl text-green-800 dark:text-green-400"
@@ -308,16 +307,6 @@ export function Sidebar() {
           </ul>
         </div>
       </nav>
-
-      <div className="mt-auto p-4 border-t">
-        <div className="flex items-center justify-between gap-4">
-          <div className="text-[10px] text-muted-foreground/60 leading-tight">
-            © 2026 Pilly AI Guide <br />
-            All rights reserved.
-          </div>
-          <ThemeToggle />
-        </div>
-      </div>
     </aside>
   );
 }
