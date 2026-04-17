@@ -100,8 +100,8 @@ export default function LoginPage(): React.ReactNode {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full items-center justify-center bg-background px-4 overflow-hidden">
-      <Card className="flex flex-col w-full max-w-lg h-[90dvh] max-h-[800px] shadow-2xl border-t-4 border-t-primary overflow-hidden">
+    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
+      <Card className="flex flex-col w-full max-w-lg shadow-2xl border-t-4 border-t-primary">
         {/* 공통 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export default function LoginPage(): React.ReactNode {
             <CardDescription>AI와 함께하는 스마트한 약 복용 관리</CardDescription>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-y-auto px-6 py-2 pb-6 space-y-8">
+          <CardContent className="flex-1 px-6 py-2 pb-6 space-y-8">
             {/* 이메일 입력 */}
             <div className="space-y-3">
               <Label htmlFor="email" className="font-semibold">
@@ -143,37 +143,39 @@ export default function LoginPage(): React.ReactNode {
                 </p>
               </div>
 
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border hover:bg-muted transition-colors active:scale-[0.99] cursor-pointer">
-                  <Checkbox
-                    id="all"
-                    checked={consents.all}
-                    onCheckedChange={(c) => handleAllConsentChange(!!c)}
-                    className="w-5 h-5 rounded-md"
-                  />
+              <div className="space-y-6 pt-2">
+                <div className="flex items-center p-3 rounded-lg bg-muted/50 border hover:bg-muted transition-colors active:scale-[0.99]">
                   <Label
                     htmlFor="all"
-                    className="flex-1 text-base font-bold cursor-pointer select-none"
+                    className="flex flex-1 items-center gap-3 text-base font-bold cursor-pointer select-none"
                   >
+                    <Checkbox
+                      id="all"
+                      checked={consents.all}
+                      onCheckedChange={(c) => handleAllConsentChange(!!c)}
+                      className="w-5 h-5 rounded-md"
+                    />
                     전체 동의하기
                   </Label>
                 </div>
 
-                <div className="pl-2 space-y-4 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-border">
-                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                    <Checkbox
-                      id="terms"
-                      checked={consents.terms}
-                      onCheckedChange={(c) => handleSingleConsentChange('terms', !!c)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 flex items-center justify-between">
-                      <Label
-                        htmlFor="terms"
-                        className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                      >
+                <div className="pl-2 space-y-6 relative before:absolute before:left-[1.125rem] before:top-2 before:bottom-2 before:w-[2px] before:bg-border">
+                  <div className="flex items-center group relative z-10 pl-8 hover:bg-muted/30 rounded-md transition-colors">
+                    <Label
+                      htmlFor="terms"
+                      className="flex flex-1 items-start gap-3 py-2.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                    >
+                      <Checkbox
+                        id="terms"
+                        checked={consents.terms}
+                        onCheckedChange={(c) => handleSingleConsentChange('terms', !!c)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm">
                         <span className="text-primary font-bold">[필수]</span> 서비스 이용약관 동의
-                      </Label>
+                      </span>
+                    </Label>
+                    <div className="pr-2">
                       <Dialog>
                         <DialogTrigger
                           render={
@@ -245,21 +247,22 @@ export default function LoginPage(): React.ReactNode {
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                    <Checkbox
-                      id="privacy"
-                      checked={consents.privacy}
-                      onCheckedChange={(c) => handleSingleConsentChange('privacy', !!c)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 flex items-center justify-between">
-                      <Label
-                        htmlFor="privacy"
-                        className="text-sm flex flex-1 items-center gap-1.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                      >
-                        <span className="text-primary font-bold">[필수]</span> 개인정보 수집 및 이용
-                        동의
-                      </Label>
+                  <div className="flex items-center group relative z-10 pl-8 hover:bg-muted/30 rounded-md transition-colors">
+                    <Label
+                      htmlFor="privacy"
+                      className="flex flex-1 items-start gap-3 py-2.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                    >
+                      <Checkbox
+                        id="privacy"
+                        checked={consents.privacy}
+                        onCheckedChange={(c) => handleSingleConsentChange('privacy', !!c)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm">
+                        <span className="text-primary font-bold">[필수]</span> 개인정보 수집 및 이용 동의
+                      </span>
+                    </Label>
+                    <div className="pr-2">
                       <Dialog>
                         <DialogTrigger
                           render={
@@ -295,21 +298,23 @@ export default function LoginPage(): React.ReactNode {
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-3 group relative z-10 pl-8">
-                    <Checkbox
-                      id="sensitive"
-                      checked={consents.sensitive}
-                      onCheckedChange={(c) => handleSingleConsentChange('sensitive', !!c)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 flex items-start flex-col sm:flex-row sm:items-center justify-between gap-1">
-                      <Label
-                        htmlFor="sensitive"
-                        className="text-sm flex flex-1 items-start gap-1.5 cursor-pointer leading-snug select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
-                      >
+                  <div className="flex items-center group relative z-10 pl-8 hover:bg-muted/30 rounded-md transition-colors">
+                    <Label
+                      htmlFor="sensitive"
+                      className="flex flex-1 items-start gap-3 py-2.5 cursor-pointer select-none font-medium active:opacity-70 group-hover:text-primary transition-colors"
+                    >
+                      <Checkbox
+                        id="sensitive"
+                        checked={consents.sensitive}
+                        onCheckedChange={(c) => handleSingleConsentChange('sensitive', !!c)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm">
                         <span className="text-primary font-bold shrink-0">[필수]</span>
                         <span>민감정보(건강 및 복약 기록 등) 수집/이용 동의</span>
-                      </Label>
+                      </span>
+                    </Label>
+                    <div className="pr-2">
                       <Dialog>
                         <DialogTrigger
                           render={

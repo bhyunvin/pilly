@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
@@ -71,14 +71,18 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   }, [pathname, router]);
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col bg-background">
-      <Sidebar />
-      <Header />
-      <main className="flex-1 pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 md:pl-64 transition-all duration-300 flex flex-col">
-        <div className="flex-1 mx-auto w-full max-w-7xl p-4 md:p-8">{children}</div>
-        <Footer />
-      </main>
-      <BottomNav />
+    <div className="relative min-h-screen flex flex-row bg-background">
+      <aside className="sticky top-0 h-screen w-64 border-r hidden md:block overflow-y-auto z-40 shrink-0">
+        <Sidebar />
+      </aside>
+      <div className="flex-1 flex flex-col min-w-0">
+        <Header />
+        <main className="flex-1 pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 transition-all duration-300 flex flex-col">
+          <div className="flex-1 mx-auto w-full max-w-7xl p-4 md:p-8">{children}</div>
+          <Footer />
+        </main>
+        <BottomNav />
+      </div>
     </div>
   );
 }

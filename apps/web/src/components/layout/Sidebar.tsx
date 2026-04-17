@@ -150,8 +150,8 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-64 border-r bg-background md:flex flex-col">
-      <div className="flex h-16 items-center justify-between px-6 border-b shrink-0">
+    <aside className="h-full w-full bg-background flex flex-col">
+      <div className="flex h-16 items-center justify-between px-8 border-b shrink-0">
         <Link
           href="/"
           className="flex items-center gap-2 font-bold text-xl text-green-800 dark:text-green-400"
@@ -159,7 +159,6 @@ export function Sidebar() {
           <Pill className="rotate-45" aria-hidden="true" />
           <span>Pilly</span>
         </Link>
-        <ThemeToggle />
       </div>
 
       <nav className="flex-1 overflow-y-auto">
@@ -310,7 +309,15 @@ export function Sidebar() {
         </div>
       </nav>
 
-      <div className="p-4 border-t text-xs text-muted-foreground">© 2026 Pilly AI Guide</div>
+      <div className="mt-auto p-4 border-t">
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-[10px] text-muted-foreground/60 leading-tight">
+            © 2026 Pilly AI Guide <br />
+            All rights reserved.
+          </div>
+          <ThemeToggle />
+        </div>
+      </div>
     </aside>
   );
 }
