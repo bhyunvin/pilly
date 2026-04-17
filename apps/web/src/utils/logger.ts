@@ -1,7 +1,6 @@
 import pino from 'pino';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const isServer = globalThis.window === undefined;
 
 /**
  * 전역 로거 인스턴스
@@ -14,16 +13,4 @@ export const logger = pino({
   browser: {
     asObject: false,
   },
-  ...(isServer && !isProduction
-    ? {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            ignore: 'pid,hostname',
-            translateTime: 'SYS:standard',
-          },
-        },
-      }
-    : {}),
 });
