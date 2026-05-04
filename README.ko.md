@@ -1,10 +1,15 @@
 # 💊 Pilly
 
-[![Bun](https://img.shields.io/badge/Bun-1.2.4-black?logo=bun)](https://bun.sh/)
+[![Bun](https://img.shields.io/badge/Bun-1.3.12-black?logo=bun)](https://bun.sh/)
 [![Next.js](https://img.shields.io/badge/Next.js-15.2.0-black?logo=next.js)](https://nextjs.org/)
-[![Turborepo](https://img.shields.io/badge/Turborepo-2.9.4-ef4444?logo=turborepo)](https://turbo.build/repo)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript)](https://www.typescriptlang.org/)
-[![ElysiaJS](https://img.shields.io/badge/ElysiaJS-Backend-f38bb4)](https://elysiajs.com/)
+[![Turborepo](https://img.shields.io/badge/Turborepo-2.9.8-ef4444?logo=turborepo)](https://turbo.build/repo)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178c6?logo=typescript)](https://www.typescriptlang.org/)
+[![ElysiaJS](https://img.shields.io/badge/ElysiaJS-1.4.28-f38bb4?logo=elysia)](https://elysiajs.com/)
+<br />
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.2.2-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45.2-c5f74f?logo=drizzle)](https://orm.drizzle.team/)
+[![Vitest](https://img.shields.io/badge/Vitest-4.1.2-6e9f18?logo=vitest)](https://vitest.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.59.1-2ead33?logo=playwright)](https://playwright.dev/)
 
 **Pilly**는 AI 기반 의약품 정보 제공 및 맞춤형 복약 상담 서비스입니다. 사용자가 복용 중인 약물을 쉽게 이해하고 관리하며, 고도로 최적화된 모바일 퍼스트 웹 애플리케이션을 통해 개인화된 조언을 얻을 수 있도록 돕습니다.
 
