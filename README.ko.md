@@ -1,7 +1,7 @@
 # 💊 Pilly
 
-[![Bun](https://img.shields.io/badge/Bun-1.3.12-black?logo=bun)](https://bun.sh/)
-[![Next.js](https://img.shields.io/badge/Next.js-15.2.0-black?logo=next.js)](https://nextjs.org/)
+[![Bun](https://img.shields.io/badge/Bun-1.3.13-black?logo=bun)](https://bun.sh/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.4-black?logo=next.js)](https://nextjs.org/)
 [![Turborepo](https://img.shields.io/badge/Turborepo-2.9.8-ef4444?logo=turborepo)](https://turbo.build/repo)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![ElysiaJS](https://img.shields.io/badge/ElysiaJS-1.4.28-f38bb4?logo=elysia)](https://elysiajs.com/)
