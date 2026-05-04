@@ -64,6 +64,20 @@ const app = new Elysia()
     };
   })
   .use(schedulerPlugin)
+  /**
+   * Health Check 라우트
+   * @description 서버 구동 상태 및 현재 서버 시간을 확인합니다.
+   */
+  .get('/', () => ({
+    success: true,
+    message: 'Pilly API Server is running!',
+    timestamp: new Date().toISOString(),
+  }))
+  .get('/health', () => ({
+    success: true,
+    message: 'Pilly API Server is running!',
+    timestamp: new Date().toISOString(),
+  }))
   .group('/api/v1', (group) =>
     group
       .use(createProfileRoutes(new Elysia()))
