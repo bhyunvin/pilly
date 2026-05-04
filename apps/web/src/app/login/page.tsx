@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 /**
  * @description 인증 중심의 세련된 로그인 페이지 컴포넌트입니다.
@@ -66,7 +67,10 @@ export default function LoginPage(): React.ReactNode {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
+    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10 relative">
+      <div className="absolute top-6 right-6">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-[400px] space-y-6">
         <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
           <CardHeader className="space-y-2 text-center pb-8 border-b border-border/50">
@@ -113,7 +117,9 @@ export default function LoginPage(): React.ReactNode {
                 <span className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">또는 이메일로 로그인</span>
+                <span className="bg-card px-2 text-muted-foreground">
+                  또는 이메일 주소로 계속하기
+                </span>
               </div>
             </div>
 
@@ -142,7 +148,7 @@ export default function LoginPage(): React.ReactNode {
                 className="w-full h-12 text-base font-bold transition-all active:scale-[0.98]"
                 disabled={isLoading || !email}
               >
-                {isLoading ? '요청 중...' : '매직 링크 발송'}
+                {isLoading ? '요청 중...' : '이메일로 로그인하기'}
                 {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
               </Button>
             </form>
