@@ -92,4 +92,13 @@ const app = new Elysia()
 
 logger.info(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 
+// 터미널 종료 신호(Graceful Shutdown) 처리
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+  process.on(signal, async () => {
+    logger.info(`[API Server] ${signal} 신호를 수신했습니다. 서버를 안전하게 종료합니다...`);
+    await app.stop();
+    process.exit(0);
+  });
+});
+
 export type App = typeof app;
