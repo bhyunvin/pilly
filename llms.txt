@@ -1,0 +1,25 @@
+# Pilly - AI-powered Medication Information and Personalized Counseling Service
+
+## Project Overview
+Pilly is a service designed to help users easily understand and manage their medications. By analyzing prescription images (Vision AI), it automatically extracts medication names, dosages, and frequencies, and provides context-aware counseling using Gemini 3.1 Flash.
+
+## Core Features
+- AI Counseling (Chat): Context-aware personalized medication counseling using the Gemini 3.1 Flash model.
+- Medication Search: Detailed medication information search integrated with public data APIs.
+- Vision AI Image Analysis: Automatically extracts medication names, dosages, and frequencies from uploaded prescription or medication bag images.
+- TTS (Text-to-Speech): Reads out AI counseling results to improve accessibility.
+- Medication Management: Easily add, delete, and monitor currently prescribed medications.
+
+---
+
+# Pilly - AI 기반 의약품 정보 및 맞춤형 복약 상담 서비스
+
+## 프로젝트 개요
+Pilly는 사용자가 복용 중인 약물을 쉽게 이해하고 관리할 수 있도록 돕는 서비스입니다. 처방전 이미지 분석(Vision AI)을 통해 약품명, 용량, 복용 빈도를 자동 추출하며, Gemini 3.1 Flash 기반의 문맥 인식 상담을 제공합니다.
+
+## 핵심 기능
+- AI 복약 상담 (Chat): Gemini 3.1 Flash 모델 기반의 문맥 인식 맞춤형 복약 상담.
+- 의약품 검색: 공공 데이터 API 연동을 통한 상세한 의약품 정보 검색.
+- Vision AI 이미지 분석: 처방전이나 약 봉투 이미지를 업로드하여 약품명, 용량, 복용 빈도를 자동 추출.
+- TTS (Text-to-Speech): 접근성 향상을 위한 AI 상담 결과 음성 읽어주기 기능.
+- 복약 정보 관리: 현재 복용 중인 약물을 쉽게 추가, 삭제, 조회하는 기능.

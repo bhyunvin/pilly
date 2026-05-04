@@ -31,6 +31,27 @@ interface SearchResponse {
 export const createSearchRoutes = (app: Elysia) => {
   return app.group('/search', (group) =>
     group
+      /**
+       * 사이트맵 생성을 위한 공개 의약품 ID 목록 조회
+       * @description SEO 최적화를 위해 모든 의약품의 고유 ID(itemSeq) 목록을 반환합니다.
+       */
+      .get(
+        '/sitemap',
+        async () => {
+          const pills = await db
+            .select({ itemSeq: pillCatalog.itemSeq })
+            .from(pillCatalog)
+            .limit(10000); // 메모리 제한 및 성능 고려 (필요시 페이지네이션)
+          return { success: true, pills };
+        },
+        {
+          detail: {
+            summary: '사이트맵용 의약품 ID 목록',
+            description: '검색 엔진 색인을 위한 의약품 ID 목록을 반환합니다.',
+            tags: ['Search', 'Public'],
+          },
+        },
+      )
       .use(authPlugin)
       /**
        * 의약품 카탈로그 조건 검색

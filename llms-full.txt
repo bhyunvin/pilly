@@ -1,0 +1,39 @@
+# Pilly - Comprehensive AI Medication Guide and Counseling Service
+
+## Service Vision
+Pilly aims to prevent medication misuse and improve health management by providing users with clear, accurate, and personalized medication information. It acts as a smart, 24/7 personal pharmacist.
+
+## Detailed Service Workflows
+
+### 1. Vision AI Prescription Analysis
+Users can upload photos of their prescriptions or medication envelopes. Pilly's Vision AI automatically recognizes the text, extracting the exact medication names, dosages, and daily frequencies. This reduces manual input errors and quickly registers the user's medication schedule.
+
+### 2. Context-Aware AI Counseling (Chat)
+Powered by Google's Gemini 3.1 Flash model, Pilly offers a highly intelligent chat interface. It considers the user's current medication list, age, gender, allergies, and underlying conditions to provide tailored advice. It can answer questions about drug interactions, side effects, and proper usage.
+
+### 3. Public Data Integration for Drug Search
+Pilly connects to public health APIs to provide comprehensive details about specific drugs. Users can search by name or physical characteristics (shape, color, imprint) to identify unknown pills and view official safety information, efficacy, and precautions.
+
+### 4. Accessibility and UX
+To ensure everyone can use the service comfortably, Pilly includes Text-to-Speech (TTS) functionality to read counseling responses out loud. The user interface is heavily optimized for mobile environments, providing a premium, app-like experience on any web browser.
+
+---
+
+# Pilly - AI 기반 종합 복약 가이드 및 상담 서비스
+
+## 서비스 비전
+Pilly는 사용자에게 명확하고 정확하며 개인화된 복약 정보를 제공하여 약물 오남용을 방지하고 건강 관리를 개선하는 것을 목표로 합니다. 연중무휴 작동하는 스마트한 개인 약사 역할을 수행합니다.
+
+## 상세 서비스 워크플로우
+
+### 1. Vision AI 처방전 분석
+사용자가 처방전이나 약 봉투 사진을 업로드하면 Pilly의 Vision AI가 텍스트를 자동으로 인식하여 정확한 약품명, 1회 투여량, 1일 투여 횟수를 추출합니다. 이를 통해 수동 입력의 번거로움을 줄이고 사용자의 복약 스케줄을 빠르게 등록할 수 있습니다.
+
+### 2. 문맥 인식 AI 상담 (Chat)
+Google의 Gemini 3.1 Flash 모델을 기반으로 하는 Pilly는 고도로 지능화된 채팅 인터페이스를 제공합니다. 사용자의 현재 복약 목록, 연령, 성별, 알레르기 및 기저 질환을 종합적으로 고려하여 맞춤형 조언을 제공합니다. 약물 상호작용, 부작용 및 올바른 복용법에 대한 질문에 답변할 수 있습니다.
+
+### 3. 공공 데이터 연동 기반 의약품 검색
+Pilly는 공공 보건 API와 연동하여 특정 약품에 대한 포괄적인 세부 정보를 제공합니다. 사용자는 이름이나 물리적 특징(모양, 색상, 식별표시)으로 검색하여 모르는 알약의 정체를 파악하고 공식적인 안전 정보, 효능 및 주의사항을 확인할 수 있습니다.
+
+### 4. 접근성 및 사용자 경험 (UX)
+모든 사람이 편안하게 서비스를 이용할 수 있도록, Pilly는 상담 응답을 소리 내어 읽어주는 TTS(Text-to-Speech) 기능을 포함합니다. 사용자 인터페이스는 모바일 환경에 고도로 최적화되어 있어, 웹 브라우저에서도 프리미엄 앱과 같은 경험을 제공합니다.
