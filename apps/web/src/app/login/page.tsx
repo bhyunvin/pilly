@@ -164,11 +164,17 @@ export default function LoginPage(): React.ReactNode {
         {/* 약관 안내 문구 */}
         <p className="px-8 text-center text-xs leading-relaxed text-muted-foreground">
           로그인 또는 가입 시 Pilly의{' '}
-          <Link href="/terms" className="underline underline-offset-4 hover:text-primary transition-colors">
+          <Link
+            href="/terms"
+            className="underline underline-offset-4 hover:text-primary transition-colors"
+          >
             서비스 이용약관
           </Link>{' '}
           및{' '}
-          <Link href="/privacy" className="underline underline-offset-4 hover:text-primary transition-colors">
+          <Link
+            href="/privacy"
+            className="underline underline-offset-4 hover:text-primary transition-colors"
+          >
             개인정보 처리방침
           </Link>
           에 동의하게 됩니다.
