@@ -1,7 +1,15 @@
-import { describe, it, expect } from 'bun:test';
-import { createChatRoutes } from './chat';
+import { describe, it, expect, mock } from 'bun:test';
 import { Elysia } from 'elysia';
 
+// 인증 미들웨어 모킹 (401 에러 방지)
+mock.module('../middleware/auth', () => ({
+  authPlugin: new Elysia({ name: 'auth' }).derive({ as: 'global' }, () => ({
+    userId: 'test_user',
+    email: 'test@example.com',
+  })),
+}));
+
+import { createChatRoutes } from './chat';
 /**
  * AI 채팅 비즈니스 로직 및 메시지 포맷팅 단위 테스트 그룹
  * @description 채팅 세션 관리, 메시지 전송 시의 유효성 검사, LLM 메시지 포맷 변환 로직을 검증합니다.

@@ -8,8 +8,9 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "ready": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" && turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test:api": "cd apps/api && bun test",
-    "test:web": "cd apps/web && bun test",
+    "test:api": "cd apps/api && bun test --parallel",
+    "test:web": "cd apps/web && bun test --parallel",
+    "test:changed": "turbo run test -- --changed",
     "test": "turbo run test",
     "perf": "unlighthouse --site http://localhost:3000"
   },
