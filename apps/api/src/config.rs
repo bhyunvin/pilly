@@ -12,6 +12,7 @@ pub struct Config {
     pub encryption_key: String,
     pub admin_api_key: String,
     pub gemini_api_key: String,
+    pub gemini_base_url: String,
     #[allow(dead_code)]
     pub data_go_kr_api_key: String,
     #[allow(dead_code)]
@@ -19,6 +20,11 @@ pub struct Config {
     pub cloudinary_cloud_name: String,
     pub cloudinary_api_key: String,
     pub cloudinary_api_secret: String,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_from: String,
 }
 
 impl Config {
@@ -48,6 +54,8 @@ impl Config {
             encryption_key: env::var("ENCRYPTION_KEY").unwrap_or_default(),
             admin_api_key: env::var("ADMIN_API_KEY").unwrap_or_default(),
             gemini_api_key: env::var("GOOGLE_GENERATIVE_AI_API_KEY").unwrap_or_default(),
+            gemini_base_url: env::var("GEMINI_BASE_URL")
+                .unwrap_or_else(|_| "https://generativelanguage.googleapis.com".to_string()),
             data_go_kr_api_key: env::var("DATA_GO_KR_API_KEY").unwrap_or_default(),
             data_go_kr_endpoint: env::var("DATA_GO_KR_ENDPOINT").unwrap_or_else(|_| {
                 "https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03".to_string()
@@ -55,6 +63,14 @@ impl Config {
             cloudinary_cloud_name: env::var("CLOUDINARY_CLOUD_NAME").unwrap_or_default(),
             cloudinary_api_key: env::var("CLOUDINARY_API_KEY").unwrap_or_default(),
             cloudinary_api_secret: env::var("CLOUDINARY_API_SECRET").unwrap_or_default(),
+            smtp_host: env::var("SMTP_HOST").unwrap_or_default(),
+            smtp_port: env::var("SMTP_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(587),
+            smtp_username: env::var("SMTP_USERNAME").unwrap_or_default(),
+            smtp_password: env::var("SMTP_PASSWORD").unwrap_or_default(),
+            smtp_from: env::var("SMTP_FROM").unwrap_or_else(|_| "noreply@pilly.app".to_string()),
         }
     }
 }

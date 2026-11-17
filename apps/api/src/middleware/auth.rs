@@ -139,3 +139,120 @@ impl FromRequestParts<AppState> for AdminUser {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{Request, StatusCode};
+    use axum::response::IntoResponse;
+    use dashmap::DashMap;
+    use jsonwebtoken::{Algorithm, EncodingKey, Header, encode, jwk::Jwk};
+    use serde::Serialize;
+    use std::sync::Arc;
+
+    use crate::{config::Config, mq::EventProducer};
+
+    #[derive(Serialize)]
+    struct TestClaims {
+        sub: String,
+        email: String,
+        exp: usize,
+    }
+
+    async fn make_test_state() -> AppState {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/nonexistent")
+            .expect("lazy pool");
+        let producer = EventProducer::connect("127.0.0.1:19999", "iggy", "iggy", pool.clone()).await;
+        let mut config = Config::from_env();
+        config.neon_auth_jwks_url = String::new();
+
+        AppState {
+            pool,
+            config,
+            http_client: reqwest::Client::new(),
+            jwks_cache: Arc::new(DashMap::new()),
+            pill_cache: moka::future::Cache::builder().max_capacity(10).build(),
+            producer,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_rejects_missing_and_invalid_tokens() {
+        let state = make_test_state().await;
+
+        // 1. Authorization 헤더 누락
+        let req = Request::builder().uri("/").body(()).unwrap();
+        let (mut parts, _) = req.into_parts();
+        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+
+        // 2. 위조된/잘못된 형식의 토큰
+        let req = Request::builder()
+            .header(AUTHORIZATION, "Bearer invalid.jwt.token")
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (mut parts, _) = req.into_parts();
+        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_rejects_expired_and_forged_jwt_with_jwk() {
+        let state = make_test_state().await;
+
+        // HS256 테스트용 JWK 등록
+        let secret = b"super-secret-test-key-for-hs256-32b";
+        let jwk: Jwk = serde_json::from_value(serde_json::json!({
+            "kty": "oct",
+            "kid": "test-kid",
+            "alg": "HS256",
+            "k": base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, secret)
+        }))
+        .unwrap();
+        state.jwks_cache.insert("test-kid".to_string(), jwk);
+
+        // 만료된 토큰
+        let mut header = Header::new(Algorithm::HS256);
+        header.kid = Some("test-kid".to_string());
+        let expired_claims = TestClaims {
+            sub: "user-1".to_string(),
+            email: "user@test.com".to_string(),
+            exp: 1000, // 과거 시간
+        };
+        let expired_token = encode(&header, &expired_claims, &EncodingKey::from_secret(secret)).unwrap();
+
+        let req = Request::builder()
+            .header(AUTHORIZATION, format!("Bearer {expired_token}"))
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (mut parts, _) = req.into_parts();
+        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+
+        // 다른 키로 서명된 위조 토큰
+        let valid_exp = (chrono::Utc::now().timestamp() + 3600) as usize;
+        let forged_claims = TestClaims {
+            sub: "user-1".to_string(),
+            email: "user@test.com".to_string(),
+            exp: valid_exp,
+        };
+        let forged_token = encode(
+            &header,
+            &forged_claims,
+            &EncodingKey::from_secret(b"wrong-secret-key-for-hs256-32bytes!"),
+        )
+        .unwrap();
+
+        let req = Request::builder()
+            .header(AUTHORIZATION, format!("Bearer {forged_token}"))
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (mut parts, _) = req.into_parts();
+        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+    }
+}

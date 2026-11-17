@@ -144,7 +144,7 @@ async fn send_message(
     .fetch_one(&state.pool)
     .await?;
 
-    let contents: Vec<Value> = body
+    let mut contents: Vec<Value> = body
         .history
         .iter()
         .map(|item| {
@@ -158,15 +158,17 @@ async fn send_message(
         .collect();
 
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={}",
-        state.config.gemini_api_key
+        "{}/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={}",
+        state.config.gemini_base_url, state.config.gemini_api_key
     );
 
+    let tools = gemini_tools();
     let payload = json!({
         "system_instruction": {
             "parts": [{ "text": SYSTEM_PROMPT }]
         },
         "contents": contents,
+        "tools": tools,
     });
 
     let res = state
@@ -179,12 +181,15 @@ async fn send_message(
 
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(32);
     let pool = state.pool.clone();
+    let http_client = state.http_client.clone();
     let enc_key = state.config.encryption_key.clone();
+    let user_id = auth_user.user_id.clone();
     let log_id = log_record.id;
 
     tokio::spawn(async move {
         let mut stream = res.bytes_stream();
         let mut full_text = String::new();
+        let mut pending_function_call: Option<(String, Value)> = None;
 
         while let Some(chunk_res) = stream.next().await {
             if let Ok(chunk) = chunk_res {
@@ -192,13 +197,72 @@ async fn send_message(
                 for line in s.lines() {
                     if let Some(json_str) = line.strip_prefix("data: ")
                         && let Ok(val) = serde_json::from_str::<Value>(json_str)
-                        && let Some(text) =
-                            val["candidates"][0]["content"]["parts"][0]["text"].as_str()
                     {
-                        full_text.push_str(text);
-                        let _ = tx.send(Ok(bytes::Bytes::from(text.to_string()))).await;
+                        let part = &val["candidates"][0]["content"]["parts"][0];
+                        if let Some(fc) = part.get("functionCall")
+                            && let Some(name) = fc["name"].as_str()
+                        {
+                            pending_function_call =
+                                Some((name.to_string(), fc["args"].clone()));
+                        } else if let Some(text) = part["text"].as_str() {
+                            full_text.push_str(text);
+                            let _ = tx.send(Ok(bytes::Bytes::from(text.to_string()))).await;
+                        }
                     }
                 }
+            }
+        }
+
+        // 모델이 Function Calling을 요청한 경우 DB 조회 후 2차 스트리밍 수행
+        if let Some((fn_name, fn_args)) = pending_function_call {
+            let fn_result = execute_tool_call(&pool, &user_id, &fn_name, &fn_args).await;
+
+            contents.push(json!({
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": fn_name,
+                        "args": fn_args,
+                    }
+                }]
+            }));
+            contents.push(json!({
+                "role": "user",
+                "parts": [{
+                    "functionResponse": {
+                        "name": fn_name,
+                        "response": { "result": fn_result },
+                    }
+                }]
+            }));
+
+            let followup_payload = json!({
+                "system_instruction": {
+                    "parts": [{ "text": SYSTEM_PROMPT }]
+                },
+                "contents": contents,
+                "tools": tools,
+            });
+
+            if let Ok(followup_res) = http_client.post(&url).json(&followup_payload).send().await {
+                let mut followup_stream = followup_res.bytes_stream();
+                while let Some(chunk_res) = followup_stream.next().await {
+                    if let Ok(chunk) = chunk_res {
+                        let s = String::from_utf8_lossy(&chunk);
+                        for line in s.lines() {
+                            if let Some(json_str) = line.strip_prefix("data: ")
+                                && let Ok(val) = serde_json::from_str::<Value>(json_str)
+                                && let Some(text) =
+                                    val["candidates"][0]["content"]["parts"][0]["text"].as_str()
+                            {
+                                full_text.push_str(text);
+                                let _ = tx.send(Ok(bytes::Bytes::from(text.to_string()))).await;
+                            }
+                        }
+                    }
+                }
+            } else {
+                tracing::error!("Gemini Function Calling 후속 스트리밍 호출 실패");
             }
         }
 
@@ -221,4 +285,95 @@ async fn send_message(
         .map_err(|e| AppError::Internal(anyhow::anyhow!(e)))?;
 
     Ok(response)
+}
+
+/// Gemini API에 전달할 Function Calling 도구 선언 목록을 반환합니다.
+fn gemini_tools() -> Value {
+    json!([{
+        "functionDeclarations": [
+            {
+                "name": "searchMedication",
+                "description": "의약품 이름으로 카탈로그(효능, 용법, 주의사항)를 검색합니다.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "검색할 의약품 이름 또는 키워드"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "getMyMedications",
+                "description": "현재 로그인한 사용자가 등록하여 복용 중인 의약품 목록을 조회합니다.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        ]
+    }])
+}
+
+/// 모델이 요청한 Function Call을 내부 DB에서 실행하고 결과를 JSON으로 반환합니다.
+async fn execute_tool_call(
+    pool: &sqlx::PgPool,
+    user_id: &str,
+    fn_name: &str,
+    args: &Value,
+) -> Value {
+    match fn_name {
+        "searchMedication" => {
+            let query = args["query"].as_str().unwrap_or("").trim();
+            if query.is_empty() {
+                return json!({ "medications": [], "message": "검색어가 비어 있습니다." });
+            }
+            let pattern = format!("%{query}%");
+            let rows = sqlx::query_as::<_, (String, String, Option<String>)>(
+                "SELECT item_name, entp_name, efcy_qesitm FROM pill_catalog WHERE item_name ILIKE $1 LIMIT 5",
+            )
+            .bind(&pattern)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            let meds: Vec<Value> = rows
+                .into_iter()
+                .map(|(name, company, efficacy)| {
+                    json!({
+                        "itemName": name,
+                        "entpName": company,
+                        "efficacy": efficacy,
+                    })
+                })
+                .collect();
+
+            json!({ "medications": meds })
+        }
+        "getMyMedications" => {
+            let rows = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
+                "SELECT medication_name, dosage, frequency FROM user_medications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20",
+            )
+            .bind(user_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            let meds: Vec<Value> = rows
+                .into_iter()
+                .map(|(name, dosage, frequency)| {
+                    json!({
+                        "medicationName": name,
+                        "dosage": dosage,
+                        "frequency": frequency,
+                    })
+                })
+                .collect();
+
+            json!({ "myMedications": meds })
+        }
+        _ => json!({ "error": format!("지원하지 않는 도구 호출입니다: {fn_name}") }),
+    }
 }

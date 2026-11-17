@@ -87,3 +87,44 @@ pub fn decrypt(text: &str, key_hex: &str) -> String {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const WRONG_KEY: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip_korean_and_ascii() {
+        let plain = "타이레놀정500mg 복용법 문의: 하루 3회 식후 30분!";
+        let encrypted = encrypt(plain, TEST_KEY);
+        assert_ne!(encrypted, plain);
+
+        // Node.js 호환 포맷: IV(24 hex):AuthTag(32 hex):Ciphertext(hex)
+        let parts: Vec<&str> = encrypted.split(':').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].len(), 24);
+        assert_eq!(parts[1].len(), 32);
+
+        let decrypted = decrypt(&encrypted, TEST_KEY);
+        assert_eq!(decrypted, plain);
+    }
+
+    #[test]
+    fn test_decrypt_fails_with_wrong_key_or_tampered_ciphertext() {
+        let plain = "민감한 건강 상담 내역";
+        let encrypted = encrypt(plain, TEST_KEY);
+
+        // 잘못된 키로 복호화 시 평문이 복원되지 않음
+        let wrong_decrypted = decrypt(&encrypted, WRONG_KEY);
+        assert_ne!(wrong_decrypted, plain);
+        assert_eq!(wrong_decrypted, encrypted);
+
+        // 변조된 암호문 복호화 시 평문이 복원되지 않음
+        let mut parts: Vec<String> = encrypted.split(':').map(String::from).collect();
+        parts[2] = "0000".to_string();
+        let tampered = parts.join(":");
+        assert_eq!(decrypt(&tampered, TEST_KEY), tampered);
+    }
+}

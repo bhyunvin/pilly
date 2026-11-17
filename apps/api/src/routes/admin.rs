@@ -14,7 +14,7 @@ use crate::{
     middleware::auth::AdminUser,
     mq::PillyEvent,
     state::AppState,
-    utils::security::decrypt,
+    utils::{mail::send_jit_access_notification, security::decrypt},
 };
 
 #[derive(Debug, Deserialize)]
@@ -292,6 +292,35 @@ async fn get_jit_chat_logs(
         .bind(approval.id)
         .execute(&state.pool)
         .await?;
+
+        // 최초 열람 시 사용자에게 개인정보 열람 고지 이메일 비동기 발송
+        let pool_clone = state.pool.clone();
+        let config_clone = state.config.clone();
+        let target_user_id = approval.user_id.clone();
+        tokio::spawn(async move {
+            let email_opt: Option<String> = sqlx::query_scalar(
+                "SELECT email FROM neon_auth.\"user\" WHERE id = $1 LIMIT 1",
+            )
+            .bind(&target_user_id)
+            .fetch_optional(&pool_clone)
+            .await
+            .ok()
+            .flatten();
+
+            if let Some(to_email) = email_opt {
+                if let Err(err) =
+                    send_jit_access_notification(&config_clone, &to_email, session_id).await
+                {
+                    tracing::error!("JIT 열람 알림 이메일 발송 오류: {}", err);
+                }
+            } else {
+                tracing::info!(
+                    "사용자 이메일을 찾을 수 없어 JIT 열람 알림 발송을 건너뜁니다. (user_id={}, session_id={})",
+                    target_user_id,
+                    session_id
+                );
+            }
+        });
     }
 
     let raw_logs: Vec<AiChatLog> = sqlx::query_as(

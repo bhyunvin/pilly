@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: pilly-postgres
+    profiles: ["local-db"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-pilly}
