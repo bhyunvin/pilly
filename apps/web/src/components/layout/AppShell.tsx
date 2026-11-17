@@ -67,7 +67,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       }
     };
 
-    checkRestriction();
+    void checkRestriction();
   }, [pathname, router]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';

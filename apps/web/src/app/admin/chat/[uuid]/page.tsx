@@ -65,7 +65,7 @@ export default function AdminChatViewPage(): React.ReactNode {
       }
     };
 
-    if (uuid) fetchChatLogs();
+    if (uuid) void fetchChatLogs();
   }, [uuid]);
 
   if (isLoading) {

@@ -85,7 +85,7 @@ export default function ChatSessionsPage(): React.ReactNode {
 
   if (isLoading) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="animate-spin" />
       </div>
     );

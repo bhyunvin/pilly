@@ -3,15 +3,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, postgres::PgPoolOptions};
 use uuid::Uuid;
 
-/// PostgreSQL 커넥션 풀을 초기화하고 마이그레이션을 실행합니다.
+/// PostgreSQL 커넥션 풀을 초기화합니다.
 pub async fn init_pool(database_url: &str) -> anyhow::Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(32)
         .connect(database_url)
         .await?;
 
-    sqlx::migrate!("./migrations").run(&pool).await?;
-    tracing::info!("PostgreSQL 연결 및 마이그레이션 완료");
+    tracing::info!("PostgreSQL 연결 완료");
     Ok(pool)
 }
 

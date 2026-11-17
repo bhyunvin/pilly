@@ -58,7 +58,7 @@ export default function AdminWithdrawalsPage(): React.ReactNode {
         setIsLoading(false);
       }
     };
-    fetchWithdrawals();
+    void fetchWithdrawals();
   }, []);
 
   if (isLoading) return <div className="p-8 text-center">탈퇴 예정자 목록을 불러오는 중...</div>;

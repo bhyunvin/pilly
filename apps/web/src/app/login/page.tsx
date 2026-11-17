@@ -71,7 +71,7 @@ export default function LoginPage(): React.ReactNode {
       <div className="absolute top-6 right-6">
         <ThemeToggle />
       </div>
-      <div className="w-full max-w-[400px] space-y-6">
+      <div className="w-full max-w-100 space-y-6">
         <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
           <CardHeader className="space-y-2 text-center pb-8 border-b border-border/50">
             <CardTitle className="text-3xl font-extrabold tracking-tight">로그인</CardTitle>

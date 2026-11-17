@@ -10,7 +10,7 @@ interface PageProps {
  * 예시(Mock) 데이터를 가져오는 비동기 함수.
  * 실제 서비스에서는 DB 또는 외부 API를 통해 의약품 정보를 가져와야 합니다.
  */
-async function getDrugInfo(id: string) {
+function getDrugInfo(id: string) {
   // 예시 데이터
   return {
     id,
@@ -28,7 +28,7 @@ async function getDrugInfo(id: string) {
  */
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = await params;
-  const drug = await getDrugInfo(resolvedParams.id);
+  const drug = getDrugInfo(resolvedParams.id);
 
   return {
     title: `${drug.name} 상세 정보 | Pilly`,
@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  */
 export default async function MedicationDetailPage({ params }: PageProps) {
   const resolvedParams = await params;
-  const drug = await getDrugInfo(resolvedParams.id);
+  const drug = getDrugInfo(resolvedParams.id);
 
   // Schema.org 'Drug' 타입 기반의 JSON-LD 객체
   const jsonLd = {

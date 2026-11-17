@@ -148,7 +148,7 @@ export function UserDetailSheet({
             {selectedUser.restrictionHistory && selectedUser.restrictionHistory.length > 0 ? (
               selectedUser.restrictionHistory.map((h) => (
                 <div key={h.id} className="relative space-y-1">
-                  <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-muted border-2 border-background" />
+                  <div className="absolute -left-5.25 top-1.5 w-3 h-3 rounded-full bg-muted border-2 border-background" />
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(h.createdAt), 'yyyy. MM. dd. HH:mm', { locale: ko })}
                   </p>

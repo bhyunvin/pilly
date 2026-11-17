@@ -118,7 +118,7 @@ export default function SearchPage() {
             key={pill.itemSeq}
             className="overflow-hidden hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer"
           >
-            <div className="aspect-[4/3] bg-muted relative flex items-center justify-center">
+            <div className="aspect-4/3 bg-muted relative flex items-center justify-center">
               {pill.itemImage ? (
                 <Image
                   src={pill.itemImage}

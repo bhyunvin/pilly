@@ -44,7 +44,7 @@ export default function RestrictedPage(): React.ReactNode {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      fetchRestrictionInfo();
+      void fetchRestrictionInfo();
     });
     return () => cancelAnimationFrame(frame);
   }, [fetchRestrictionInfo]);
