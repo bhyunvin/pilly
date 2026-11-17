@@ -13,9 +13,7 @@ pub struct Config {
     pub admin_api_key: String,
     pub gemini_api_key: String,
     pub gemini_base_url: String,
-    #[allow(dead_code)]
     pub data_go_kr_api_key: String,
-    #[allow(dead_code)]
     pub data_go_kr_endpoint: String,
     pub cloudinary_cloud_name: String,
     pub cloudinary_api_key: String,

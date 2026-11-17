@@ -91,9 +91,18 @@ impl FromRequestParts<AppState> for AuthUser {
         .fetch_optional(&state.pool)
         .await?;
 
-        let is_restore_path = parts.uri.path().ends_with("/profile/restore");
+        // 중첩 라우터는 URI 접두사가 제거되므로 원본 경로(OriginalUri)로 판별한다.
+        let original_path = parts
+            .extensions
+            .get::<axum::extract::OriginalUri>()
+            .map_or_else(|| parts.uri.path().to_string(), |u| u.0.path().to_string());
+        let is_restore_path = original_path.ends_with("/profile/restore");
+        // 제한/탈퇴 유예 사용자도 자신의 상태 확인을 위해 프로필 조회(GET)는 허용한다.
+        let is_profile_read =
+            parts.method == axum::http::Method::GET && original_path.ends_with("/profile");
         if let Some((status, deleted_at)) = row
             && !is_restore_path
+            && !is_profile_read
         {
             if status == "RESTRICTED" {
                 return Err(AppError::Forbidden(

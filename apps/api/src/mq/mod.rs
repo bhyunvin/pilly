@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
 
 use iggy::client::{Client, MessageClient, StreamClient, TopicClient, UserClient};
 use iggy::clients::client::IggyClient;
@@ -13,13 +12,16 @@ use iggy::messages::send_messages::{Message, Partitioning};
 use iggy::utils::expiry::IggyExpiry;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, QueryBuilder};
+use tokio::sync::{Mutex, RwLock};
+
+use crate::sync::{PillSyncConfig, sync_pill_catalog};
 
 const STREAM_NAME: &str = "pilly-events";
 const ACTIVITY_TOPIC: &str = "user-activity";
 const PARTITION_ID: u32 = 1;
 
 /// Iggy 스트림으로 전송되는 비동기 이벤트 페이로드
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PillyEvent {
     UserActivity {
         user_id: String,
@@ -41,11 +43,39 @@ pub enum PillyEvent {
     CleanupWithdrawnUsers,
 }
 
+type ActivityRow = (String, String, Option<String>);
+
+impl PillyEvent {
+    /// 활동 로그(`user_activity_logs`)로 기록되는 이벤트를 `(user_id, action, details)`로 변환합니다.
+    /// 배치 작업 이벤트(`SyncPills`, `CleanupWithdrawnUsers`)는 `None`입니다.
+    fn into_activity(self) -> Option<ActivityRow> {
+        match self {
+            Self::UserActivity {
+                user_id,
+                action,
+                details,
+            } => Some((user_id, action, details)),
+            Self::SearchStat { user_id, query } => {
+                Some((user_id, "SEARCH".to_string(), Some(query)))
+            }
+            Self::AdminAudit {
+                admin_id,
+                action,
+                target_id,
+            } => Some((admin_id, format!("ADMIN_{action}"), Some(target_id))),
+            Self::SyncPills { .. } | Self::CleanupWithdrawnUsers => None,
+        }
+    }
+}
+
 /// Apache Iggy 비동기 이벤트 프로듀서
 #[derive(Clone)]
 pub struct EventProducer {
     client: Arc<RwLock<Option<Arc<IggyClient>>>>,
     pool: PgPool,
+    http: reqwest::Client,
+    pill_sync: Option<Arc<PillSyncConfig>>,
+    sync_lock: Arc<Mutex<()>>,
 }
 
 impl EventProducer {
@@ -83,6 +113,9 @@ impl EventProducer {
         let producer = Self {
             client: Arc::new(RwLock::new(initial_client)),
             pool,
+            http: reqwest::Client::new(),
+            pill_sync: None,
+            sync_lock: Arc::new(Mutex::new(())),
         };
 
         producer.spawn_reconnect_loop(
@@ -94,8 +127,13 @@ impl EventProducer {
         producer
     }
 
+    /// 의약품 동기화(`SyncPills`) 이벤트 처리에 사용할 공공데이터 API 설정을 지정합니다.
+    pub fn with_pill_sync(mut self, cfg: PillSyncConfig) -> Self {
+        self.pill_sync = Some(Arc::new(cfg));
+        self
+    }
+
     /// 현재 Iggy 스트리밍 연결 활성 여부를 반환합니다.
-    #[allow(dead_code)]
     pub async fn is_connected(&self) -> bool {
         self.client.read().await.is_some()
     }
@@ -136,6 +174,7 @@ impl EventProducer {
         });
     }
 
+    /// Iggy 서버에 접속하여 로그인하고, 스트림/토픽이 없으면 생성합니다.
     async fn try_connect(
         address: &str,
         username: &str,
@@ -149,15 +188,15 @@ impl EventProducer {
         client.connect().await?;
         client.login_user(username, password).await?;
 
-        // 스트림 및 토픽이 없으면 생성
+        // 주의: get_stream/get_topic은 미존재 시 Err가 아닌 Ok(None)을 반환한다.
         let stream_id = Identifier::named(STREAM_NAME)?;
-        if client.get_stream(&stream_id).await.is_err() {
-            let _ = client.create_stream(STREAM_NAME, None).await;
+        if client.get_stream(&stream_id).await?.is_none() {
+            client.create_stream(STREAM_NAME, None).await?;
         }
 
         let topic_id = Identifier::named(ACTIVITY_TOPIC)?;
-        if client.get_topic(&stream_id, &topic_id).await.is_err() {
-            let _ = client
+        if client.get_topic(&stream_id, &topic_id).await?.is_none() {
+            client
                 .create_topic(
                     &stream_id,
                     ACTIVITY_TOPIC,
@@ -168,14 +207,14 @@ impl EventProducer {
                     IggyExpiry::NeverExpire,
                     None.into(),
                 )
-                .await;
+                .await?;
         }
 
         Ok(client)
     }
 
     /// 이벤트를 bincode 바이너리로 직렬화하여 Iggy 스트림에 초고속 발행합니다.
-    /// Iggy가 오프라인이거나 발행에 실패한 경우 이벤트 유실 방지를 위해 PostgreSQL에 직접 기록합니다.
+    /// Iggy가 오프라인이거나 발행에 실패한 경우 이벤트 유실 방지를 위해 직접 처리(DB 폴백)합니다.
     pub async fn publish(&self, event: PillyEvent) {
         let client_opt = self.client.read().await.clone();
         if let Some(client) = client_opt
@@ -208,51 +247,128 @@ impl EventProducer {
             }
         }
 
-        self.fallback_to_db(event).await;
+        self.handle_directly(event).await;
     }
 
-    /// Iggy 오프라인 또는 발행 실패 시 PostgreSQL에 직접 이벤트를 기록합니다.
-    async fn fallback_to_db(&self, event: PillyEvent) {
-        let (user_id, action, details) = match event {
-            PillyEvent::UserActivity {
-                user_id,
-                action,
-                details,
-            } => (user_id, action, details),
-            PillyEvent::SearchStat { user_id, query } => {
-                (user_id, "SEARCH".to_string(), Some(query))
-            }
-            PillyEvent::AdminAudit {
-                admin_id,
-                action,
-                target_id,
-            } => (admin_id, format!("ADMIN_{action}"), Some(target_id)),
+    /// Iggy를 거치지 않고 이벤트를 즉시 처리합니다. (Iggy 오프라인 시 폴백)
+    async fn handle_directly(&self, event: PillyEvent) {
+        match event {
             PillyEvent::SyncPills { triggered_by } => {
-                (triggered_by, "SYNC_PILLS".to_string(), None)
+                let this = self.clone();
+                tokio::spawn(async move { this.run_pill_sync(&triggered_by).await });
             }
             PillyEvent::CleanupWithdrawnUsers => {
-                execute_cleanup_withdrawn_users(&self.pool).await;
-                return;
+                let pool = self.pool.clone();
+                tokio::spawn(
+                    async move { log_cleanup_result(cleanup_withdrawn_users(&pool).await) },
+                );
             }
+            other => {
+                if let Some(row) = other.into_activity() {
+                    insert_activities(&self.pool, vec![row]).await;
+                }
+            }
+        }
+    }
+
+    /// 공공데이터포털 의약품 카탈로그를 동기화하고 결과를 활동 로그에 기록합니다.
+    /// 이미 동기화가 진행 중이면 중복 실행하지 않습니다.
+    pub async fn run_pill_sync(&self, triggered_by: &str) {
+        let Ok(_guard) = self.sync_lock.try_lock() else {
+            tracing::info!("의약품 동기화가 이미 진행 중이어서 요청을 건너뜁니다.");
+            return;
         };
 
-        if let Err(err) = sqlx::query(
-            "INSERT INTO user_activity_logs (user_id, action, details) VALUES ($1, $2, $3)",
+        let (action, details) = match &self.pill_sync {
+            None => (
+                "SYNC_PILLS_SKIPPED",
+                "공공데이터 API 설정이 없습니다.".to_string(),
+            ),
+            Some(cfg) => match sync_pill_catalog(&self.pool, &self.http, cfg).await {
+                Ok(total) => ("SYNC_PILLS", format!("synced={total}")),
+                Err(err) => {
+                    tracing::error!("의약품 동기화 실패: {err:?}");
+                    ("SYNC_PILLS_FAILED", err.to_string())
+                }
+            },
+        };
+
+        insert_activities(
+            &self.pool,
+            vec![(triggered_by.to_string(), action.to_string(), Some(details))],
         )
-        .bind(user_id)
-        .bind(action)
-        .bind(details)
-        .execute(&self.pool)
-        .await
-        {
-            tracing::error!("DB 폴백 이벤트 기록 실패: {:?}", err);
-        }
+        .await;
     }
 }
 
-/// 백그라운드에서 Iggy 스트림을 배치 단위로 폴링하여 PostgreSQL에 Bulk INSERT 하는 워커를 시작합니다.
+/// 활동 로그를 Bulk INSERT 합니다.
+async fn insert_activities(pool: &PgPool, activities: Vec<ActivityRow>) {
+    if activities.is_empty() {
+        return;
+    }
+    let mut qb = QueryBuilder::new("INSERT INTO user_activity_logs (user_id, action, details) ");
+    qb.push_values(activities, |mut b, (user_id, action, details)| {
+        b.push_bind(user_id).push_bind(action).push_bind(details);
+    });
+    if let Err(err) = qb.build().execute(pool).await {
+        tracing::error!("활동 로그 Bulk INSERT 실패: {:?}", err);
+    }
+}
+
+/// 30일 유예 기간이 경과한 탈퇴 계정과 해당 사용자의 모든 개인 데이터를 물리 삭제(Hard Delete)합니다.
+/// 삭제된 계정 수를 반환합니다.
+pub async fn cleanup_withdrawn_users(pool: &PgPool) -> Result<usize, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    let expired: Vec<String> = sqlx::query_scalar(
+        "SELECT user_id FROM user_profiles \
+         WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '30 days'",
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+
+    if expired.is_empty() {
+        tx.commit().await?;
+        return Ok(0);
+    }
+
+    let statements = [
+        "DELETE FROM ai_chat_logs WHERE user_id = ANY($1)",
+        "DELETE FROM inquiry_attachments WHERE inquiry_id IN (SELECT id FROM user_inquiries WHERE user_id = ANY($1))",
+        "DELETE FROM user_inquiries WHERE user_id = ANY($1)",
+        "DELETE FROM chat_access_approvals WHERE user_id = ANY($1)",
+        "DELETE FROM chat_sessions WHERE user_id = ANY($1)",
+        "DELETE FROM medication_history WHERE medication_id IN (SELECT id FROM user_medications WHERE user_id = ANY($1))",
+        "DELETE FROM user_medications WHERE user_id = ANY($1)",
+        "DELETE FROM user_activity_logs WHERE user_id = ANY($1)",
+        "DELETE FROM user_restriction_history WHERE user_id = ANY($1)",
+        "DELETE FROM user_profiles WHERE user_id = ANY($1)",
+    ];
+    for sql in statements {
+        sqlx::query(sql).bind(&expired).execute(&mut *tx).await?;
+    }
+
+    tx.commit().await?;
+    Ok(expired.len())
+}
+
+fn log_cleanup_result(result: Result<usize, sqlx::Error>) {
+    match result {
+        Ok(0) => tracing::info!("삭제 대상 만료 계정이 없습니다."),
+        Ok(n) => tracing::info!("만료된 탈퇴 계정 {n}건 물리 삭제 완료"),
+        Err(err) => tracing::error!("탈퇴 계정 정리 오류: {err:?}"),
+    }
+}
+
+/// 백그라운드에서 Iggy 스트림을 배치 단위로 폴링하여 이벤트를 처리하는 워커를 시작합니다.
+/// 활동성 이벤트는 PostgreSQL에 Bulk INSERT 하고, 배치 작업 이벤트는 별도 태스크로 실행합니다.
 /// 연결이 없거나 단절되면 지수 백오프(5초 -> 최대 60초)로 자동 재연결합니다.
-pub fn spawn_batch_consumer(address: String, username: String, password: String, pool: PgPool) {
+pub fn spawn_batch_consumer(
+    address: String,
+    username: String,
+    password: String,
+    producer: EventProducer,
+) {
     tokio::spawn(async move {
         let mut backoff_secs = 5u64;
         loop {
@@ -274,10 +390,10 @@ pub fn spawn_batch_consumer(address: String, username: String, password: String,
                 }
             };
 
-            let Ok(stream_id) = Identifier::named(STREAM_NAME) else {
-                return;
-            };
-            let Ok(topic_id) = Identifier::named(ACTIVITY_TOPIC) else {
+            let (Ok(stream_id), Ok(topic_id)) = (
+                Identifier::named(STREAM_NAME),
+                Identifier::named(ACTIVITY_TOPIC),
+            ) else {
                 return;
             };
             let consumer = Consumer::default();
@@ -301,62 +417,27 @@ pub fn spawn_batch_consumer(address: String, username: String, password: String,
                     Ok(polled) if !polled.messages.is_empty() => {
                         let mut activities = Vec::new();
                         for msg in polled.messages {
-                            if let Ok(event) = bincode::deserialize::<PillyEvent>(&msg.payload) {
-                                match event {
-                                    PillyEvent::UserActivity {
-                                        user_id,
-                                        action,
-                                        details,
-                                    } => {
-                                        activities.push((user_id, action, details));
-                                    }
-                                    PillyEvent::SearchStat { user_id, query } => {
-                                        activities.push((
-                                            user_id,
-                                            "SEARCH".to_string(),
-                                            Some(query),
-                                        ));
-                                    }
-                                    PillyEvent::AdminAudit {
-                                        admin_id,
-                                        action,
-                                        target_id,
-                                    } => {
-                                        activities.push((
-                                            admin_id,
-                                            format!("ADMIN_{action}"),
-                                            Some(target_id),
-                                        ));
-                                    }
-                                    PillyEvent::SyncPills { triggered_by } => {
-                                        activities.push((
-                                            triggered_by,
-                                            "SYNC_PILLS".to_string(),
-                                            None,
-                                        ));
-                                    }
-                                    PillyEvent::CleanupWithdrawnUsers => {
-                                        let pool_clone = pool.clone();
-                                        tokio::spawn(async move {
-                                            execute_cleanup_withdrawn_users(&pool_clone).await;
-                                        });
-                                    }
+                            let Ok(event) = bincode::deserialize::<PillyEvent>(&msg.payload) else {
+                                tracing::warn!("역직렬화할 수 없는 Iggy 메시지를 건너뜁니다.");
+                                continue;
+                            };
+                            match event {
+                                PillyEvent::SyncPills { triggered_by } => {
+                                    let this = producer.clone();
+                                    tokio::spawn(
+                                        async move { this.run_pill_sync(&triggered_by).await },
+                                    );
                                 }
+                                PillyEvent::CleanupWithdrawnUsers => {
+                                    let pool = producer.pool.clone();
+                                    tokio::spawn(async move {
+                                        log_cleanup_result(cleanup_withdrawn_users(&pool).await)
+                                    });
+                                }
+                                other => activities.extend(other.into_activity()),
                             }
                         }
-
-                        if !activities.is_empty() {
-                            let mut qb = QueryBuilder::new(
-                                "INSERT INTO user_activity_logs (user_id, action, details) ",
-                            );
-                            qb.push_values(activities, |mut b, (user_id, action, details)| {
-                                b.push_bind(user_id).push_bind(action).push_bind(details);
-                            });
-
-                            if let Err(err) = qb.build().execute(&pool).await {
-                                tracing::error!("Iggy 배치 Bulk INSERT 실패: {:?}", err);
-                            }
-                        }
+                        insert_activities(&producer.pool, activities).await;
                     }
                     Ok(_) => {}
                     Err(err) => {
@@ -369,40 +450,21 @@ pub fn spawn_batch_consumer(address: String, username: String, password: String,
     });
 }
 
-/// 30일 유예 기간이 경과한 탈퇴 계정을 물리 삭제(Hard Delete)합니다.
-async fn execute_cleanup_withdrawn_users(pool: &PgPool) {
-    match sqlx::query_scalar::<_, String>(
-        "DELETE FROM user_profiles \
-         WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '30 days' \
-         RETURNING user_id",
-    )
-    .fetch_all(pool)
-    .await
-    {
-        Ok(deleted_ids) => {
-            if deleted_ids.is_empty() {
-                tracing::info!("삭제 대상 만료 계정이 없습니다.");
-            } else {
-                tracing::info!("만료된 탈퇴 계정 {}건 물리 삭제 완료", deleted_ids.len());
-            }
-        }
-        Err(err) => {
-            tracing::error!("탈퇴 계정 정리 오류: {:?}", err);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_pilly_event_bincode_roundtrip() {
-        let events = vec![
+    fn all_events() -> Vec<PillyEvent> {
+        vec![
             PillyEvent::UserActivity {
                 user_id: "user-123".to_string(),
                 action: "TAKE_MEDICATION".to_string(),
                 details: Some("타이레놀 1정".to_string()),
+            },
+            PillyEvent::UserActivity {
+                user_id: "user-123".to_string(),
+                action: "NO_DETAILS".to_string(),
+                details: None,
             },
             PillyEvent::SearchStat {
                 user_id: "user-123".to_string(),
@@ -413,70 +475,65 @@ mod tests {
                 action: "ROLE_CHANGE".to_string(),
                 target_id: "user-123".to_string(),
             },
-        ];
+            PillyEvent::SyncPills {
+                triggered_by: "scheduler".to_string(),
+            },
+            PillyEvent::CleanupWithdrawnUsers,
+        ]
+    }
 
-        for event in events {
-            let encoded = bincode::serialize(&event).expect("bincode 직렬화 성공");
-            let decoded: PillyEvent =
-                bincode::deserialize(&encoded).expect("bincode 역직렬화 성공");
-            match (event, decoded) {
-                (
-                    PillyEvent::UserActivity {
-                        user_id: u1,
-                        action: a1,
-                        details: d1,
-                    },
-                    PillyEvent::UserActivity {
-                        user_id: u2,
-                        action: a2,
-                        details: d2,
-                    },
-                ) => {
-                    assert_eq!(u1, u2);
-                    assert_eq!(a1, a2);
-                    assert_eq!(d1, d2);
-                }
-                (
-                    PillyEvent::SearchStat {
-                        user_id: u1,
-                        query: q1,
-                    },
-                    PillyEvent::SearchStat {
-                        user_id: u2,
-                        query: q2,
-                    },
-                ) => {
-                    assert_eq!(u1, u2);
-                    assert_eq!(q1, q2);
-                }
-                (
-                    PillyEvent::AdminAudit {
-                        admin_id: a1,
-                        action: ac1,
-                        target_id: t1,
-                    },
-                    PillyEvent::AdminAudit {
-                        admin_id: a2,
-                        action: ac2,
-                        target_id: t2,
-                    },
-                ) => {
-                    assert_eq!(a1, a2);
-                    assert_eq!(ac1, ac2);
-                    assert_eq!(t1, t2);
-                }
-                _ => panic!("역직렬화된 이벤트 타입 불일치"),
-            }
+    #[test]
+    fn test_all_events_bincode_roundtrip() {
+        for event in all_events() {
+            let encoded = bincode::serialize(&event).expect("직렬화 성공");
+            let decoded: PillyEvent = bincode::deserialize(&encoded).expect("역직렬화 성공");
+            assert_eq!(event, decoded);
         }
     }
 
+    #[test]
+    fn test_bincode_rejects_corrupted_payload() {
+        assert!(bincode::deserialize::<PillyEvent>(&[0xFF, 0xFF, 0xFF, 0xFF, 0x01]).is_err());
+        assert!(bincode::deserialize::<PillyEvent>(&[]).is_err());
+    }
+
+    #[test]
+    fn test_into_activity_mapping() {
+        let rows: Vec<_> = all_events()
+            .into_iter()
+            .map(PillyEvent::into_activity)
+            .collect();
+        assert_eq!(
+            rows[0],
+            Some((
+                "user-123".into(),
+                "TAKE_MEDICATION".into(),
+                Some("타이레놀 1정".into())
+            ))
+        );
+        assert_eq!(
+            rows[2],
+            Some(("user-123".into(), "SEARCH".into(), Some("게보린".into())))
+        );
+        assert_eq!(
+            rows[3],
+            Some((
+                "admin-1".into(),
+                "ADMIN_ROLE_CHANGE".into(),
+                Some("user-123".into())
+            ))
+        );
+        // 배치 작업 이벤트는 활동 로그로 기록되지 않는다.
+        assert_eq!(rows[4], None);
+        assert_eq!(rows[5], None);
+    }
+
     #[tokio::test]
-    async fn test_iggy_offline_fallback_mode() {
+    async fn test_iggy_offline_starts_in_fallback_mode() {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://localhost/nonexistent")
             .expect("lazy pool 생성");
 
-        // 존재하지 않는 포트로 연결 시 패닉 없이 DB 폴백 모드로 초기화되어야 함
         let producer = EventProducer::connect("127.0.0.1:19999", "iggy", "iggy", pool).await;
         assert!(!producer.is_connected().await);
     }

@@ -83,6 +83,20 @@ async fn create_inquiry(
         ));
     }
 
+    if let Some(session_id) = chat_session_id {
+        let owned: Option<(i32,)> =
+            sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2")
+                .bind(session_id)
+                .bind(&auth_user.user_id)
+                .fetch_optional(&state.pool)
+                .await?;
+        if owned.is_none() {
+            return Err(AppError::BadRequest(
+                "본인의 채팅 세션만 문의에 연결할 수 있습니다.".to_string(),
+            ));
+        }
+    }
+
     let inquiry: UserInquiry = sqlx::query_as(
         "INSERT INTO user_inquiries (user_id, title, content, chat_session_id, allow_chat_access) VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, chat_session_id, title, content, allow_chat_access, chat_access_id, status::text, created_at",
     )
@@ -93,6 +107,23 @@ async fn create_inquiry(
     .bind(allow_chat_access)
     .fetch_one(&state.pool)
     .await?;
+
+    // 사용자가 채팅 열람에 동의한 경우 관리자 JIT 열람 승인 레코드를 생성한다.
+    if allow_chat_access && let Some(session_id) = chat_session_id {
+        let (approval_id,): (uuid::Uuid,) = sqlx::query_as(
+            "INSERT INTO chat_access_approvals (user_id, chat_session_id) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(&auth_user.user_id)
+        .bind(session_id)
+        .fetch_one(&state.pool)
+        .await?;
+
+        sqlx::query("UPDATE user_inquiries SET chat_access_id = $1 WHERE id = $2")
+            .bind(approval_id)
+            .bind(inquiry.id)
+            .execute(&state.pool)
+            .await?;
+    }
 
     // Cloudinary 업로드
     if !attachments.is_empty() && !state.config.cloudinary_cloud_name.is_empty() {

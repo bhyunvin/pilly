@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use dashmap::DashMap;
 use jsonwebtoken::jwk::Jwk;
@@ -18,4 +18,21 @@ pub struct AppState {
     pub pill_cache: Cache<String, Vec<PillCatalog>>,
     /// JWKS 공개키 캐시 (kid -> Jwk)
     pub jwks_cache: Arc<DashMap<String, Jwk>>,
+}
+
+impl AppState {
+    /// 운영 서버와 테스트가 공통으로 사용하는 기본 상태를 생성합니다.
+    pub fn new(pool: PgPool, config: Config, producer: EventProducer) -> Self {
+        Self {
+            pool,
+            config,
+            producer,
+            http_client: reqwest::Client::new(),
+            pill_cache: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_live(Duration::from_secs(600))
+                .build(),
+            jwks_cache: Arc::new(DashMap::new()),
+        }
+    }
 }

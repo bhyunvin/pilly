@@ -55,7 +55,7 @@ pub fn router() -> Router<AppState> {
 async fn get_medications(
     State(state): State<AppState>,
     auth_user: AuthUser,
-) -> AppResult<Json<Vec<UserMedication>>> {
+) -> AppResult<Json<Value>> {
     let meds: Vec<UserMedication> = sqlx::query_as(
         "SELECT id, user_id, name, dosage, frequency, start_date, end_date, status, created_at FROM user_medications WHERE user_id = $1 ORDER BY created_at DESC",
     )
@@ -63,7 +63,10 @@ async fn get_medications(
     .fetch_all(&state.pool)
     .await?;
 
-    Ok(Json(meds))
+    Ok(Json(json!({
+        "success": true,
+        "medications": meds,
+    })))
 }
 
 /// 새로운 복약 정보 추가
@@ -89,7 +92,7 @@ async fn create_medication(
         StatusCode::CREATED,
         Json(json!({
             "success": true,
-            "data": med,
+            "medication": med,
         })),
     ))
 }

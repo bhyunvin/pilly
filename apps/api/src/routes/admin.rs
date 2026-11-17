@@ -108,7 +108,7 @@ async fn list_withdrawals(
 
     Ok(Json(json!({
         "success": true,
-        "withdrawals": withdrawals,
+        "data": withdrawals,
     })))
 }
 
@@ -341,6 +341,6 @@ async fn get_jit_chat_logs(
 
     Ok(Json(json!({
         "success": true,
-        "logs": logs,
+        "data": logs,
     })))
 }

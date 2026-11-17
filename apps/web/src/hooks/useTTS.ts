@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { logger } from '@/utils/logger';
 
 /**
@@ -90,13 +90,15 @@ interface UseTTSReturn {
 export const useTTS = (): UseTTSReturn => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [ttsSupported, setTtsSupported] = useState(false);
+  const ttsSupported = useSyncExternalStore(
+    () => () => {},
+    () => typeof globalThis !== 'undefined' && Boolean(globalThis.speechSynthesis),
+    () => false,
+  );
   const activeUtterances = useRef<SpeechSynthesisUtterance[]>([]);
 
   useEffect(() => {
     if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
-      queueMicrotask(() => setTtsSupported(true));
-
       const loadVoices = () => {
         const availableVoices = globalThis.speechSynthesis.getVoices();
         setVoices(availableVoices);

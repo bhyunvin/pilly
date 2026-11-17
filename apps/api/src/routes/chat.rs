@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, State},
     http::{StatusCode, header},
     response::Response,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use futures::StreamExt;
 use serde::Deserialize;
@@ -48,7 +48,48 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/sessions", get(get_sessions).post(create_session))
         .route("/sessions/{id}", get(get_session_logs))
+        .route("/sessions/{id}/title", patch(update_session_title))
         .route("/sessions/{id}/message", post(send_message))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateSessionTitleRequest {
+    pub title: String,
+}
+
+/// 채팅 세션 제목 수정 (본인 세션만 가능)
+async fn update_session_title(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(session_id): Path<i32>,
+    Json(body): Json<UpdateSessionTitleRequest>,
+) -> AppResult<Json<Value>> {
+    let title = body.title.trim();
+    if title.is_empty() || title.chars().count() > 100 {
+        return Err(AppError::BadRequest(
+            "제목은 1자 이상 100자 이하로 입력해 주세요.".to_string(),
+        ));
+    }
+
+    let updated: Option<ChatSession> = sqlx::query_as(
+        "UPDATE chat_sessions SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id, user_id, title, created_at, updated_at",
+    )
+    .bind(title)
+    .bind(session_id)
+    .bind(&auth_user.user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let Some(session) = updated else {
+        return Err(AppError::NotFound(
+            "채팅 세션을 찾을 수 없습니다.".to_string(),
+        ));
+    };
+
+    Ok(Json(json!({
+        "success": true,
+        "data": session,
+    })))
 }
 
 /// 사용자의 활성화된 모든 채팅 세션 목록 조회
@@ -124,6 +165,18 @@ async fn send_message(
     Path(session_id): Path<i32>,
     Json(body): Json<SendMessageRequest>,
 ) -> AppResult<Response> {
+    let owned: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2")
+            .bind(session_id)
+            .bind(&auth_user.user_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if owned.is_none() {
+        return Err(AppError::NotFound(
+            "채팅 세션을 찾을 수 없습니다.".to_string(),
+        ));
+    }
+
     let user_prompt = body
         .history
         .iter()
@@ -178,6 +231,13 @@ async fn send_message(
         .send()
         .await
         .map_err(|e| AppError::External(format!("Gemini 스트리밍 호출 실패: {e}")))?;
+
+    if !res.status().is_success() {
+        return Err(AppError::External(format!(
+            "Gemini API 오류 응답: {}",
+            res.status()
+        )));
+    }
 
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(32);
     let pool = state.pool.clone();
@@ -330,8 +390,8 @@ async fn execute_tool_call(
                 return json!({ "medications": [], "message": "검색어가 비어 있습니다." });
             }
             let pattern = format!("%{query}%");
-            let rows = sqlx::query_as::<_, (String, String, Option<String>)>(
-                "SELECT item_name, entp_name, efcy_qesitm FROM pill_catalog WHERE item_name ILIKE $1 LIMIT 5",
+            let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>)>(
+                "SELECT item_seq, item_name, entp_name, chart, drug_shape, color_class1 FROM pill_catalog WHERE item_name ILIKE $1 LIMIT 5",
             )
             .bind(&pattern)
             .fetch_all(pool)
@@ -340,20 +400,25 @@ async fn execute_tool_call(
 
             let meds: Vec<Value> = rows
                 .into_iter()
-                .map(|(name, company, efficacy)| {
-                    json!({
-                        "itemName": name,
-                        "entpName": company,
-                        "efficacy": efficacy,
-                    })
-                })
+                .map(
+                    |(item_seq, name, company, chart, drug_shape, color_class1)| {
+                        json!({
+                            "itemSeq": item_seq,
+                            "itemName": name,
+                            "entpName": company,
+                            "chart": chart,
+                            "drugShape": drug_shape,
+                            "colorClass1": color_class1,
+                        })
+                    },
+                )
                 .collect();
 
             json!({ "medications": meds })
         }
         "getMyMedications" => {
             let rows = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
-                "SELECT medication_name, dosage, frequency FROM user_medications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20",
+                "SELECT name, dosage, frequency FROM user_medications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20",
             )
             .bind(user_id)
             .fetch_all(pool)

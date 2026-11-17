@@ -73,11 +73,20 @@ test.describe('Chatting Flow and Session Management', () => {
     // 4. 채팅 세션 페이지로 리다이렉트 (Mocking 적용 전 대기)
     await page.waitForURL(/\/chat\/\d+/);
 
+    // 채팅 세션 내역 조회 모킹 (초기 로드 404 방지)
+    await page.route('**/api/v1/chat/sessions/123', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, logs: [] }),
+      });
+    });
+
     // 메시지 전송 API 모킹
     await page.route('**/chat/sessions/*/message', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'text/plain',
+        contentType: 'text/plain; charset=utf-8',
         body: 'AI 답변입니다.',
       });
     });
@@ -88,7 +97,8 @@ test.describe('Chatting Flow and Session Management', () => {
     await input.fill('감기약 성분이 궁금해요.');
     await page.keyboard.press('Enter');
 
-    // 6. AI 응답 대기 상태 확인
-    await expect(page.locator('text=AI가 답변을 작성 중입니다')).toBeVisible();
+    // 6. 스트리밍된 AI 최종 답변 렌더링 확인
+    await expect(page.locator('text=감기약 성분이 궁금해요.')).toBeVisible();
+    await expect(page.locator('text=AI 답변입니다.')).toBeVisible();
   });
 });
