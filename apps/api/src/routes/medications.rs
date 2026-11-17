@@ -13,6 +13,7 @@ use crate::{
     db::UserMedication,
     error::{AppError, AppResult},
     middleware::auth::AuthUser,
+    mq::PillyEvent,
     state::AppState,
 };
 
@@ -25,10 +26,28 @@ pub struct CreateMedicationRequest {
     pub start_date: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RecordHistoryRequest {
+    pub status: String,
+}
+
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct MedicationHistoryItem {
+    id: i32,
+    medication_id: Option<i32>,
+    status: Option<String>,
+    taken_at: Option<chrono::NaiveDateTime>,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(get_medications).post(create_medication))
         .route("/{id}", delete(delete_medication))
+        .route(
+            "/{id}/history",
+            get(get_medication_history).post(record_medication_history),
+        )
         .route("/analyze-image", post(analyze_image))
 }
 
@@ -93,6 +112,85 @@ async fn delete_medication(
         "success": true,
         "message": "삭제되었습니다.",
     })))
+}
+
+/// 특정 약물의 복약 이력 조회
+async fn get_medication_history(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(medication_id): Path<i32>,
+) -> AppResult<Json<Value>> {
+    let items: Vec<MedicationHistoryItem> = sqlx::query_as(
+        "SELECT mh.id, mh.medication_id, mh.status::text, mh.taken_at \
+         FROM medication_history mh \
+         INNER JOIN user_medications um ON mh.medication_id = um.id \
+         WHERE mh.medication_id = $1 AND um.user_id = $2 \
+         ORDER BY mh.taken_at DESC LIMIT 100",
+    )
+    .bind(medication_id)
+    .bind(&auth_user.user_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(json!({
+        "success": true,
+        "history": items,
+    })))
+}
+
+/// 복약 체크 이력 기록 (PENDING / COMPLETED / SKIPPED) + Iggy 활동 이벤트 발행
+async fn record_medication_history(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(medication_id): Path<i32>,
+    Json(body): Json<RecordHistoryRequest>,
+) -> AppResult<(StatusCode, Json<Value>)> {
+    if !matches!(body.status.as_str(), "PENDING" | "COMPLETED" | "SKIPPED") {
+        return Err(AppError::BadRequest(
+            "상태는 PENDING, COMPLETED, SKIPPED 중 하나여야 합니다.".to_string(),
+        ));
+    }
+
+    let owns: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM user_medications WHERE id = $1 AND user_id = $2 LIMIT 1")
+            .bind(medication_id)
+            .bind(&auth_user.user_id)
+            .fetch_optional(&state.pool)
+            .await?;
+
+    if owns.is_none() {
+        return Err(AppError::NotFound("복약 정보를 찾을 수 없습니다.".to_string()));
+    }
+
+    let item: MedicationHistoryItem = sqlx::query_as(
+        "INSERT INTO medication_history (medication_id, status) VALUES ($1, $2::medication_status) \
+         RETURNING id, medication_id, status::text, taken_at",
+    )
+    .bind(medication_id)
+    .bind(&body.status)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let producer = state.producer.clone();
+    let user_id = auth_user.user_id;
+    let status = body.status;
+    tokio::spawn(async move {
+        producer
+            .publish(PillyEvent::UserActivity {
+                user_id,
+                action: format!("MEDICATION_{status}"),
+                details: Some(format!("medication_id={medication_id}")),
+            })
+            .await;
+    });
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "success": true,
+            "data": item,
+        })),
+    ))
 }
 
 /// 이미지 분석을 통한 복약 정보 추출 (Gemini Vision AI)

@@ -7,6 +7,7 @@ mod error;
 mod middleware;
 mod mq;
 mod routes;
+mod scheduler;
 mod state;
 mod utils;
 
@@ -41,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
         &config.iggy_address,
         &config.iggy_username,
         &config.iggy_password,
+        pool.clone(),
     )
     .await;
 
@@ -50,6 +52,8 @@ async fn main() -> anyhow::Result<()> {
         config.iggy_password.clone(),
         pool.clone(),
     );
+
+    scheduler::spawn_cleanup_scheduler(pool.clone());
 
     let state = AppState {
         pool,

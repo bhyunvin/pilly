@@ -40,26 +40,28 @@ pub enum PillyEvent {
 #[derive(Clone)]
 pub struct EventProducer {
     client: Option<Arc<IggyClient>>,
+    pool: PgPool,
 }
 
 impl EventProducer {
     /// Iggy 서버에 연결하고 스트림/토픽을 초기화합니다.
-    /// 연결 실패 시에도 서버가 중단되지 않도록 None으로 폴백합니다.
-    pub async fn connect(address: &str, username: &str, password: &str) -> Self {
+    /// 연결 실패 시에도 서버가 중단되지 않도록 PostgreSQL 직접 적재 모드로 폴백합니다.
+    pub async fn connect(address: &str, username: &str, password: &str, pool: PgPool) -> Self {
         match Self::try_connect(address, username, password).await {
             Ok(client) => {
                 tracing::info!("Apache Iggy 연결 성공 ({})", address);
                 Self {
                     client: Some(Arc::new(client)),
+                    pool,
                 }
             }
             Err(err) => {
                 tracing::warn!(
-                    "Apache Iggy 연결 실패 ({}): {:?}. 오프라인 모드로 동작합니다.",
+                    "Apache Iggy 연결 실패 ({}): {:?}. PostgreSQL 직접 적재 폴백 모드로 동작합니다.",
                     address,
                     err
                 );
-                Self { client: None }
+                Self { client: None, pool }
             }
         }
     }
@@ -103,8 +105,35 @@ impl EventProducer {
     }
 
     /// 이벤트를 bincode 바이너리로 직렬화하여 Iggy 스트림에 초고속 발행합니다.
+    /// Iggy가 오프라인인 경우 이벤트 유실 방지를 위해 PostgreSQL에 직접 기록합니다.
     pub async fn publish(&self, event: PillyEvent) {
         let Some(client) = &self.client else {
+            let (user_id, action, details) = match event {
+                PillyEvent::UserActivity {
+                    user_id,
+                    action,
+                    details,
+                } => (user_id, action, details),
+                PillyEvent::SearchStat { user_id, query } => {
+                    (user_id, "SEARCH".to_string(), Some(query))
+                }
+                PillyEvent::AdminAudit {
+                    admin_id,
+                    action,
+                    target_id,
+                } => (admin_id, format!("ADMIN_{action}"), Some(target_id)),
+            };
+            if let Err(err) = sqlx::query(
+                "INSERT INTO user_activity_logs (user_id, action, details) VALUES ($1, $2, $3)",
+            )
+            .bind(user_id)
+            .bind(action)
+            .bind(details)
+            .execute(&self.pool)
+            .await
+            {
+                tracing::error!("DB 폴백 이벤트 기록 실패: {:?}", err);
+            }
             return;
         };
 
@@ -145,7 +174,7 @@ pub fn spawn_batch_consumer(
     pool: PgPool,
 ) {
     tokio::spawn(async move {
-        let producer = EventProducer::connect(&address, &username, &password).await;
+        let producer = EventProducer::connect(&address, &username, &password, pool.clone()).await;
         let Some(client) = producer.client else {
             tracing::warn!("Iggy 컨슈머 워커: Iggy 연결이 없어 대기 모드로 종료합니다.");
             return;
