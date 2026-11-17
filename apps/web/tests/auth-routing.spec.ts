@@ -71,7 +71,13 @@ test.describe('Auth Routing and Restriction Redirects', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          data: { userId: 'user_2', nickname: '제한됨', status: 'RESTRICTED', deletedAt: null },
+          data: {
+            userId: 'user_2',
+            nickname: '제한됨',
+            status: 'RESTRICTED',
+            restrictedReason: '반복적인 부적절 게시물 작성',
+            deletedAt: null,
+          },
         }),
       });
     });
@@ -79,5 +85,6 @@ test.describe('Auth Routing and Restriction Redirects', () => {
     await page.goto('/chat');
     await expect(page).toHaveURL(/\/restricted/, { timeout: 15000 });
     await expect(page.locator('text=계정 이용이 제한되었습니다')).toBeVisible();
+    await expect(page.locator('text=반복적인 부적절 게시물 작성')).toBeVisible();
   });
 });

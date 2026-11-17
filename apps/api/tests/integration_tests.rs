@@ -530,6 +530,24 @@ async fn test_medications_activity_profile_inquiry_and_admin_routes() {
     let session_json: Value = serde_json::from_slice(&body).unwrap();
     let session_id = session_json["data"]["id"].as_i64().unwrap();
 
+    // 세션 제목 수정 (PATCH /api/v1/chat/sessions/{id}/title)
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::PATCH)
+                .uri(format!("/api/v1/chat/sessions/{session_id}/title"))
+                .header(AUTHORIZATION, format!("Bearer {user_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({ "title": "수정된 세션 제목" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
     // 승인 전에는 관리자 JIT 열람 403 Forbidden
     let res = app
         .clone()
@@ -575,7 +593,28 @@ async fn test_medications_activity_profile_inquiry_and_admin_routes() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    // 승인 후 관리자 JIT 열람 200 OK
+    // 승인 후 관리자 JIT 열람 200 OK (세션 ID 및 승인 UUID 모두 지원)
+    let approval_uuid: uuid::Uuid = sqlx::query_scalar(
+        "SELECT id FROM chat_access_approvals WHERE chat_session_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(session_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/admin/chat/{approval_uuid}"))
+                .header(AUTHORIZATION, format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
     let res = app
         .clone()
         .oneshot(
