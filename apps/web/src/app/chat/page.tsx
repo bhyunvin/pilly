@@ -48,7 +48,9 @@ export default function ChatSessionsPage(): React.ReactNode {
   }, [apiFetch]);
 
   useEffect(() => {
-    fetchSessions();
+    queueMicrotask(() => {
+      void fetchSessions();
+    });
   }, [fetchSessions]);
 
   /**

@@ -51,7 +51,9 @@ export default function MedicationsPage() {
   }, [apiFetch]);
 
   useEffect(() => {
-    fetchMedications();
+    queueMicrotask(() => {
+      void fetchMedications();
+    });
   }, [fetchMedications]);
 
   /**

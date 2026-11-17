@@ -76,7 +76,9 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (selectedShape || selectedColor) {
-      handleSearch();
+      queueMicrotask(() => {
+        void handleSearch();
+      });
     }
   }, [selectedShape, selectedColor, handleSearch]);
 

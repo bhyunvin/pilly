@@ -11,7 +11,9 @@ pub fn spawn_cleanup_scheduler(producer: EventProducer) {
 
         loop {
             interval.tick().await;
-            tracing::info!("--- 24시간 주기 배치 이벤트 발행 (CleanupWithdrawnUsers, SyncPills) ---");
+            tracing::info!(
+                "--- 24시간 주기 배치 이벤트 발행 (CleanupWithdrawnUsers, SyncPills) ---"
+            );
             producer.publish(PillyEvent::CleanupWithdrawnUsers).await;
             producer
                 .publish(PillyEvent::SyncPills {

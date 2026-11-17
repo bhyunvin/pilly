@@ -127,13 +127,15 @@ export default function ChatSessionPage(): React.ReactNode {
   }, [sessionId, apiFetch]);
 
   useEffect(() => {
-    fetchHistory();
+    queueMicrotask(() => {
+      void fetchHistory();
+    });
   }, [fetchHistory]);
 
   useEffect(() => {
     if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
       synth.current = globalThis.speechSynthesis;
-      setTtsSupported(true);
+      queueMicrotask(() => setTtsSupported(true));
     }
   }, []);
 
@@ -275,18 +277,20 @@ export default function ChatSessionPage(): React.ReactNode {
     setIsVisionModalOpen(false);
     setIsLoading(true);
     try {
-      for (const med of medsToAdd) {
-        await apiFetch('/medications', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: med.name,
-            dosage: med.dosage,
-            frequency: med.frequency,
-            startDate: new Date().toISOString(),
+      await Promise.all(
+        medsToAdd.map((med) =>
+          apiFetch('/medications', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: med.name,
+              dosage: med.dosage,
+              frequency: med.frequency,
+              startDate: new Date().toISOString(),
+            }),
           }),
-        });
-      }
-      handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
+        ),
+      );
+      await handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
     } catch (err) {
       logger.error({ err }, 'Vision confirm error');
       alert('약물 추가 중 오류가 발생했습니다.');
@@ -316,7 +320,7 @@ export default function ChatSessionPage(): React.ReactNode {
 
   if (isInitializing) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="animate-spin text-primary" aria-hidden="true" />
       </div>
     );

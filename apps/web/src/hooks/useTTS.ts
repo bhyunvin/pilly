@@ -95,7 +95,7 @@ export const useTTS = (): UseTTSReturn => {
 
   useEffect(() => {
     if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
-      setTtsSupported(true);
+      queueMicrotask(() => setTtsSupported(true));
 
       const loadVoices = () => {
         const availableVoices = globalThis.speechSynthesis.getVoices();

@@ -4,8 +4,13 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:web": "cd apps/web && bun run dev",
     "dev:api": "cd apps/api && cargo run --bin pilly-api",
     "dev:iggy": "IGGY_SYSTEM_PATH=./.iggy-data IGGY_SYSTEM_CACHE_SIZE=64MB IGGY_TCP_ADDRESS=127.0.0.1:8090 iggy-server",
+    "dev:all": "bun run dev:iggy & bun run dev:api & bun run dev:web",
+    "sync:pills": "cd apps/api && cargo run --release --bin sync_pills",
+    "docker:iggy": "docker compose up -d",
+    "docker:api": "docker build -t pilly-api-all-in-one ./apps/api && docker run --rm -p 3001:3001 --env-file ./apps/api/.env pilly-api-all-in-one",
     "lint": "turbo run lint && (cd apps/api && cargo clippy --all-targets -- -D warnings)",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" && (cd apps/api && cargo fmt --all)",
     "ready": "bun run format && bun run lint",

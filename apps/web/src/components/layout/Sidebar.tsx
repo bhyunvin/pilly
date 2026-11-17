@@ -99,8 +99,10 @@ export function Sidebar() {
   };
 
   useEffect(() => {
-    fetchProfile();
-    fetchSessions();
+    queueMicrotask(() => {
+      void fetchProfile();
+      void fetchSessions();
+    });
 
     globalThis.addEventListener('refresh-sessions', fetchSessions);
     return () => globalThis.removeEventListener('refresh-sessions', fetchSessions);

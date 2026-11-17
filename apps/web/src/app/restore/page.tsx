@@ -54,7 +54,9 @@ export default function RestorePage(): React.ReactNode {
   }, [router, apiFetch]);
 
   useEffect(() => {
-    fetchProfile();
+    queueMicrotask(() => {
+      void fetchProfile();
+    });
   }, [fetchProfile]);
 
   /**

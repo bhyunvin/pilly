@@ -77,7 +77,9 @@ export default function ProfilePage(): React.ReactNode {
   }, [router, apiFetch]);
 
   useEffect(() => {
-    fetchProfile();
+    queueMicrotask(() => {
+      void fetchProfile();
+    });
   }, [fetchProfile]);
 
   /**

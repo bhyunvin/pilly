@@ -141,8 +141,7 @@ export default function AdminUsersPage(): React.ReactNode {
       });
       const statusUpdateResponse = await httpResponse.json();
       if (statusUpdateResponse.success) {
-        fetchUsers();
-        fetchUserDetails(userId);
+        await Promise.all([fetchUsers(), fetchUserDetails(userId)]);
         setRestrictionReason('');
       }
     } catch (err) {
@@ -166,8 +165,7 @@ export default function AdminUsersPage(): React.ReactNode {
       });
       const statusUpdateResponse = await httpResponse.json();
       if (statusUpdateResponse.success) {
-        fetchUsers();
-        fetchUserDetails(userId);
+        await Promise.all([fetchUsers(), fetchUserDetails(userId)]);
         setRestrictionReason('');
       }
     } catch (err) {
@@ -176,7 +174,9 @@ export default function AdminUsersPage(): React.ReactNode {
   };
 
   useEffect(() => {
-    fetchUsers();
+    queueMicrotask(() => {
+      void fetchUsers();
+    });
   }, [fetchUsers]);
 
   if (isLoading) {
