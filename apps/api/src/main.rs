@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         pool.clone(),
     );
 
-    scheduler::spawn_cleanup_scheduler(pool.clone());
+    scheduler::spawn_cleanup_scheduler(producer.clone());
 
     let state = AppState {
         pool,

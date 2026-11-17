@@ -35,6 +35,10 @@ pub enum PillyEvent {
         action: String,
         target_id: String,
     },
+    SyncPills {
+        triggered_by: String,
+    },
+    CleanupWithdrawnUsers,
 }
 
 /// Apache Iggy 비동기 이벤트 프로듀서
@@ -223,6 +227,13 @@ impl EventProducer {
                 action,
                 target_id,
             } => (admin_id, format!("ADMIN_{action}"), Some(target_id)),
+            PillyEvent::SyncPills { triggered_by } => {
+                (triggered_by, "SYNC_PILLS".to_string(), None)
+            }
+            PillyEvent::CleanupWithdrawnUsers => {
+                execute_cleanup_withdrawn_users(&self.pool).await;
+                return;
+            }
         };
 
         if let Err(err) = sqlx::query(
@@ -317,6 +328,19 @@ pub fn spawn_batch_consumer(address: String, username: String, password: String,
                                             Some(target_id),
                                         ));
                                     }
+                                    PillyEvent::SyncPills { triggered_by } => {
+                                        activities.push((
+                                            triggered_by,
+                                            "SYNC_PILLS".to_string(),
+                                            None,
+                                        ));
+                                    }
+                                    PillyEvent::CleanupWithdrawnUsers => {
+                                        let pool_clone = pool.clone();
+                                        tokio::spawn(async move {
+                                            execute_cleanup_withdrawn_users(&pool_clone).await;
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -343,6 +367,29 @@ pub fn spawn_batch_consumer(address: String, username: String, password: String,
             }
         }
     });
+}
+
+/// 30일 유예 기간이 경과한 탈퇴 계정을 물리 삭제(Hard Delete)합니다.
+async fn execute_cleanup_withdrawn_users(pool: &PgPool) {
+    match sqlx::query_scalar::<_, String>(
+        "DELETE FROM user_profiles \
+         WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '30 days' \
+         RETURNING user_id",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(deleted_ids) => {
+            if deleted_ids.is_empty() {
+                tracing::info!("삭제 대상 만료 계정이 없습니다.");
+            } else {
+                tracing::info!("만료된 탈퇴 계정 {}건 물리 삭제 완료", deleted_ids.len());
+            }
+        }
+        Err(err) => {
+            tracing::error!("탈퇴 계정 정리 오류: {:?}", err);
+        }
+    }
 }
 
 #[cfg(test)]

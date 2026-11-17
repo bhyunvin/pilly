@@ -55,6 +55,13 @@ async fn sync_pills(State(state): State<AppState>, headers: HeaderMap) -> AppRes
         return Err(AppError::Unauthorized("Unauthorized".to_string()));
     }
 
+    state
+        .producer
+        .publish(PillyEvent::SyncPills {
+            triggered_by: "admin".to_string(),
+        })
+        .await;
+
     Ok(Json(json!({
         "success": true,
         "message": "Sync started",

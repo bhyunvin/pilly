@@ -30,7 +30,7 @@ pub fn create_app(state: AppState) -> Router {
         .nest("/api/v1/activity", routes::activity::router())
         .nest("/api/v1/chat", routes::chat::router())
         .nest("/api/v1/profile", routes::profile::router())
-        .nest("/api/v1/inquiries", routes::inquiry::router())
+        .nest("/api/v1/inquiry", routes::inquiry::router())
         .nest("/api/v1/admin", routes::admin::router())
         .with_state(state)
 }
