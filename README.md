@@ -113,6 +113,31 @@ pilly/
    - Web App: http://localhost:3000
    - API Server: http://localhost:4000
 
+## 🦀 Rust + Apache Iggy Backend (`apps/api`)
+
+### Infrastructure (PostgreSQL & Apache Iggy)
+```bash
+docker compose up -d
+```
+
+### Run API Server
+```bash
+cd apps/api
+cargo run --release --bin pilly-api
+```
+
+### Sync Pill Catalog
+```bash
+cd apps/api
+cargo run --release --bin sync_pills
+```
+
+### Load Testing (`oha`)
+```bash
+# Health check benchmark (10,000 requests, 200 concurrent)
+oha -n 10000 -c 200 http://localhost:3001/health
+```
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

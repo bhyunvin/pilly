@@ -37,3 +37,7 @@ test-results
 
 # Drizzle generated files
 drizzle/
+
+# Rust build artifacts
+target/
+**/target/
