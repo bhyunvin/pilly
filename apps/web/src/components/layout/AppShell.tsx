@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { logger } from '@/utils/logger';
 import { authClient } from '@/lib/auth';
+import { useApi } from '@/hooks/useApi';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
@@ -20,6 +21,7 @@ import { Footer } from './Footer';
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
+  const { apiFetch } = useApi();
 
   useEffect(() => {
     const checkRestriction = async () => {
@@ -38,14 +40,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         const { data: sessionData } = await authClient.getSession();
         if (!sessionData) return;
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
-          {
-            headers: {
-              Authorization: `Bearer ${sessionData.session.id}`,
-            },
-          },
-        );
+        const response = await apiFetch('/profile');
 
         if (response.ok) {
           const result = await response.json();
@@ -68,7 +63,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     };
 
     void checkRestriction();
-  }, [pathname, router]);
+  }, [pathname, router, apiFetch]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 

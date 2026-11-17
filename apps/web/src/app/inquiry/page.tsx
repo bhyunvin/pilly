@@ -47,13 +47,14 @@ export default function InquiryPage(): React.ReactNode {
     setError('');
 
     try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('content', content);
+      formData.append('allow_chat_access', allowChatAccess ? 'true' : 'false');
+
       const response = await apiFetch('/inquiry', {
         method: 'POST',
-        body: JSON.stringify({
-          title,
-          content,
-          allow_chat_access: allowChatAccess,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {

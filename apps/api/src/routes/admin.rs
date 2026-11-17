@@ -255,24 +255,43 @@ async fn update_user_status(
     })))
 }
 
-/// JIT(Just-In-Time) 채팅 로그 접근 제어 (24시간 유효, 복호화 반환)
+/// JIT(Just-In-Time) 채팅 로그 접근 제어 (세션 ID 또는 승인 UUID 지원, 24시간 유효)
 async fn get_jit_chat_logs(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(session_id): Path<i32>,
+    Path(target): Path<String>,
 ) -> AppResult<Json<Value>> {
-    let approval: Option<ChatAccessApproval> = sqlx::query_as(
-        "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE chat_session_id = $1 ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(session_id)
-    .fetch_optional(&state.pool)
-    .await?;
+    let approval: Option<ChatAccessApproval> = if let Ok(approval_uuid) =
+        uuid::Uuid::parse_str(&target)
+    {
+        sqlx::query_as(
+            "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE id = $1 LIMIT 1",
+        )
+        .bind(approval_uuid)
+        .fetch_optional(&state.pool)
+        .await?
+    } else if let Ok(session_id) = target.parse::<i32>() {
+        sqlx::query_as(
+            "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE chat_session_id = $1 ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(session_id)
+        .fetch_optional(&state.pool)
+        .await?
+    } else {
+        return Err(AppError::BadRequest(
+            "유효하지 않은 채팅 조회 식별자입니다.".to_string(),
+        ));
+    };
 
     let Some(approval) = approval else {
         return Err(AppError::Forbidden(
             "해당 채팅방에 대한 접근 권한이 승인되지 않았습니다.".to_string(),
         ));
     };
+
+    let session_id = approval
+        .chat_session_id
+        .ok_or_else(|| AppError::NotFound("연결된 채팅 세션을 찾을 수 없습니다.".to_string()))?;
 
     let now = Utc::now().naive_utc();
     if approval.accessed_at.is_some() {

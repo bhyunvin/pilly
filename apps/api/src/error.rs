@@ -21,6 +21,9 @@ pub enum AppError {
     #[error("잘못된 요청입니다: {0}")]
     BadRequest(String),
 
+    #[error("리소스 충돌: {0}")]
+    Conflict(String),
+
     #[error("데이터베이스 오류: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -38,6 +41,7 @@ impl IntoResponse for AppError {
             AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
             AppError::Database(err) => {
                 tracing::error!("Database error: {:?}", err);
                 (

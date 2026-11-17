@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { logger } from '@/utils/logger';
-import { authClient } from '@/lib/auth';
+import { useApi } from '@/hooks/useApi';
 import {
   Table,
   TableBody,
@@ -30,6 +30,7 @@ interface WithdrawalUser {
  * @returns 탈퇴 예정자 관리 페이지 렌더링 결과
  */
 export default function AdminWithdrawalsPage(): React.ReactNode {
+  const { apiFetch } = useApi();
   const [withdrawals, setWithdrawals] = useState<WithdrawalUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,13 +42,7 @@ export default function AdminWithdrawalsPage(): React.ReactNode {
      */
     const fetchWithdrawals = async () => {
       try {
-        const { data: sessionData } = await authClient.getSession();
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/admin/withdrawals`,
-          {
-            headers: { Authorization: `Bearer ${sessionData?.session.id}` },
-          },
-        );
+        const response = await apiFetch('/admin/withdrawals');
         const result = await response.json();
         if (result.success) {
           setWithdrawals(result.data);
@@ -59,7 +54,7 @@ export default function AdminWithdrawalsPage(): React.ReactNode {
       }
     };
     void fetchWithdrawals();
-  }, []);
+  }, [apiFetch]);
 
   if (isLoading) return <div className="p-8 text-center">탈퇴 예정자 목록을 불러오는 중...</div>;
 

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ShieldAlert, LogOut, MessageCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth';
+import { useApi } from '@/hooks/useApi';
 import { format } from 'date-fns';
 
 interface RestrictionInfo {
@@ -21,6 +22,7 @@ interface RestrictionInfo {
  * @returns 이용 제한 안내 페이지 렌더링 결과
  */
 export default function RestrictedPage(): React.ReactNode {
+  const { apiFetch } = useApi();
   const [restrictionInfo, setRestrictionInfo] = useState<RestrictionInfo | null>(null);
 
   /**
@@ -30,17 +32,15 @@ export default function RestrictedPage(): React.ReactNode {
    */
   const fetchRestrictionInfo = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile/restriction`,
-      );
+      const response = await apiFetch('/profile');
       const result = await response.json();
-      if (result.success) {
+      if (result.success && result.data) {
         setRestrictionInfo(result.data);
       }
     } catch (err) {
       logger.error({ err }, 'Failed to fetch restriction info');
     }
-  }, []);
+  }, [apiFetch]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {

@@ -25,9 +25,56 @@ pub struct WithdrawRequest {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(get_profile).patch(update_profile))
+        .route(
+            "/",
+            get(get_profile).post(create_profile).patch(update_profile),
+        )
         .route("/withdraw", post(withdraw_profile))
         .route("/restore", post(restore_profile))
+}
+
+/// 신규 사용자 초기 프로필 생성 (닉네임 중복 시 409 Conflict)
+async fn create_profile(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Json(body): Json<UpdateProfileRequest>,
+) -> AppResult<Json<Value>> {
+    let nickname = body.nickname.trim();
+    let len = nickname.chars().count();
+    if !(2..=40).contains(&len) {
+        return Err(AppError::BadRequest(
+            "닉네임은 2자 이상 40자 이하로 입력해 주세요.".to_string(),
+        ));
+    }
+
+    let duplicate: Option<(String,)> = sqlx::query_as(
+        "SELECT user_id FROM user_profiles WHERE nickname = $1 AND user_id <> $2 LIMIT 1",
+    )
+    .bind(nickname)
+    .bind(&auth_user.user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if duplicate.is_some() {
+        return Err(AppError::Conflict(
+            "이미 사용 중인 닉네임입니다.".to_string(),
+        ));
+    }
+
+    let profile: UserProfile = sqlx::query_as(
+        "INSERT INTO user_profiles (user_id, nickname, role, status) VALUES ($1, $2, 'USER', 'ACTIVE') \
+         ON CONFLICT (user_id) DO UPDATE SET nickname = EXCLUDED.nickname, updated_at = NOW() \
+         RETURNING user_id, nickname, role, status, restricted_reason, restricted_at, deleted_at, deletion_reason, created_at, updated_at",
+    )
+    .bind(&auth_user.user_id)
+    .bind(nickname)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(json!({
+        "success": true,
+        "data": profile,
+    })))
 }
 
 /// 내 프로필 정보 조회
