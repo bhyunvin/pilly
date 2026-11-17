@@ -116,23 +116,27 @@ pilly/
 ## 🦀 Rust + Apache Iggy Backend (`apps/api`)
 
 ### Infrastructure (PostgreSQL & Apache Iggy)
+
 ```bash
 docker compose up -d
 ```
 
 ### Run API Server
+
 ```bash
 cd apps/api
 cargo run --release --bin pilly-api
 ```
 
 ### Sync Pill Catalog
+
 ```bash
 cd apps/api
 cargo run --release --bin sync_pills
 ```
 
 ### Load Testing (`oha`)
+
 ```bash
 # Health check benchmark (10,000 requests, 200 concurrent)
 oha -n 10000 -c 200 http://localhost:3001/health

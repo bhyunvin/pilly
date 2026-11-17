@@ -31,10 +31,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// 내 프로필 정보 조회
-async fn get_profile(
-    State(state): State<AppState>,
-    auth_user: AuthUser,
-) -> AppResult<Json<Value>> {
+async fn get_profile(State(state): State<AppState>, auth_user: AuthUser) -> AppResult<Json<Value>> {
     let user: Option<UserProfile> = sqlx::query_as(
         "SELECT user_id, nickname, role, status, restricted_reason, restricted_at, deleted_at, deletion_reason, created_at, updated_at FROM user_profiles WHERE user_id = $1 LIMIT 1",
     )

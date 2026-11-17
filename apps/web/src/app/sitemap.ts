@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       success: boolean;
       pills: { itemSeq: string }[];
     }>('/api/v1/search/sitemap');
-    
+
     if (!error && data?.success) {
       drugSitemaps = data.pills.map((pill: { itemSeq: string }) => ({
         url: `${baseUrl}/medications/${pill.itemSeq}`,

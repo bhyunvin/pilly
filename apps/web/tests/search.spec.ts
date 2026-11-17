@@ -30,7 +30,9 @@ test.describe('의약품 검색 및 필터링 흐름', () => {
     await page.goto('/search');
     await page.waitForLoadState('networkidle');
 
-    const searchInput = page.locator('input[type="search"], input[type="text"], input[placeholder*="검색"]').first();
+    const searchInput = page
+      .locator('input[type="search"], input[type="text"], input[placeholder*="검색"]')
+      .first();
     if (await searchInput.isVisible()) {
       await searchInput.fill('타이레놀');
       await searchInput.press('Enter');

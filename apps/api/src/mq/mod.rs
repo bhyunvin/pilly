@@ -49,28 +49,32 @@ impl EventProducer {
     /// 연결 실패 시에도 서버가 중단되지 않도록 PostgreSQL 직접 적재 모드로 폴백하며,
     /// 백그라운드에서 지수 백오프로 자동 재연결을 시도합니다.
     pub async fn connect(address: &str, username: &str, password: &str, pool: PgPool) -> Self {
-        let initial_client =
-            match tokio::time::timeout(Duration::from_secs(2), Self::try_connect(address, username, password)).await {
-                Ok(Ok(client)) => {
-                    tracing::info!("Apache Iggy 연결 성공 ({})", address);
-                    Some(Arc::new(client))
-                }
-                Ok(Err(err)) => {
-                    tracing::warn!(
-                        "Apache Iggy 연결 실패 ({}): {:?}. PostgreSQL 직접 적재 폴백 모드로 동작합니다.",
-                        address,
-                        err
-                    );
-                    None
-                }
-                Err(_) => {
-                    tracing::warn!(
-                        "Apache Iggy 연결 타임아웃 ({}). PostgreSQL 직접 적재 폴백 모드로 동작합니다.",
-                        address
-                    );
-                    None
-                }
-            };
+        let initial_client = match tokio::time::timeout(
+            Duration::from_secs(2),
+            Self::try_connect(address, username, password),
+        )
+        .await
+        {
+            Ok(Ok(client)) => {
+                tracing::info!("Apache Iggy 연결 성공 ({})", address);
+                Some(Arc::new(client))
+            }
+            Ok(Err(err)) => {
+                tracing::warn!(
+                    "Apache Iggy 연결 실패 ({}): {:?}. PostgreSQL 직접 적재 폴백 모드로 동작합니다.",
+                    address,
+                    err
+                );
+                None
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "Apache Iggy 연결 타임아웃 ({}). PostgreSQL 직접 적재 폴백 모드로 동작합니다.",
+                    address
+                );
+                None
+            }
+        };
 
         let producer = Self {
             client: Arc::new(RwLock::new(initial_client)),
@@ -109,7 +113,10 @@ impl EventProducer {
                 match Self::try_connect(&address, &username, &password).await {
                     Ok(new_client) => {
                         *client_lock.write().await = Some(Arc::new(new_client));
-                        tracing::info!("Apache Iggy 재연결 및 스트리밍 모드 복구 완료 ({})", address);
+                        tracing::info!(
+                            "Apache Iggy 재연결 및 스트리밍 모드 복구 완료 ({})",
+                            address
+                        );
                         backoff_secs = 5;
                     }
                     Err(err) => {
@@ -234,12 +241,7 @@ impl EventProducer {
 
 /// 백그라운드에서 Iggy 스트림을 배치 단위로 폴링하여 PostgreSQL에 Bulk INSERT 하는 워커를 시작합니다.
 /// 연결이 없거나 단절되면 지수 백오프(5초 -> 최대 60초)로 자동 재연결합니다.
-pub fn spawn_batch_consumer(
-    address: String,
-    username: String,
-    password: String,
-    pool: PgPool,
-) {
+pub fn spawn_batch_consumer(address: String, username: String, password: String, pool: PgPool) {
     tokio::spawn(async move {
         let mut backoff_secs = 5u64;
         loop {
@@ -319,19 +321,19 @@ pub fn spawn_batch_consumer(
                             }
                         }
 
-                    if !activities.is_empty() {
-                        let mut qb = QueryBuilder::new(
-                            "INSERT INTO user_activity_logs (user_id, action, details) ",
-                        );
-                        qb.push_values(activities, |mut b, (user_id, action, details)| {
-                            b.push_bind(user_id).push_bind(action).push_bind(details);
-                        });
+                        if !activities.is_empty() {
+                            let mut qb = QueryBuilder::new(
+                                "INSERT INTO user_activity_logs (user_id, action, details) ",
+                            );
+                            qb.push_values(activities, |mut b, (user_id, action, details)| {
+                                b.push_bind(user_id).push_bind(action).push_bind(details);
+                            });
 
-                        if let Err(err) = qb.build().execute(&pool).await {
-                            tracing::error!("Iggy 배치 Bulk INSERT 실패: {:?}", err);
+                            if let Err(err) = qb.build().execute(&pool).await {
+                                tracing::error!("Iggy 배치 Bulk INSERT 실패: {:?}", err);
+                            }
                         }
                     }
-                }
                     Ok(_) => {}
                     Err(err) => {
                         tracing::warn!("Iggy 폴링 중 연결 오류: {:?}. 재연결을 시도합니다.", err);
@@ -368,26 +370,49 @@ mod tests {
 
         for event in events {
             let encoded = bincode::serialize(&event).expect("bincode 직렬화 성공");
-            let decoded: PillyEvent = bincode::deserialize(&encoded).expect("bincode 역직렬화 성공");
+            let decoded: PillyEvent =
+                bincode::deserialize(&encoded).expect("bincode 역직렬화 성공");
             match (event, decoded) {
                 (
-                    PillyEvent::UserActivity { user_id: u1, action: a1, details: d1 },
-                    PillyEvent::UserActivity { user_id: u2, action: a2, details: d2 },
+                    PillyEvent::UserActivity {
+                        user_id: u1,
+                        action: a1,
+                        details: d1,
+                    },
+                    PillyEvent::UserActivity {
+                        user_id: u2,
+                        action: a2,
+                        details: d2,
+                    },
                 ) => {
                     assert_eq!(u1, u2);
                     assert_eq!(a1, a2);
                     assert_eq!(d1, d2);
                 }
                 (
-                    PillyEvent::SearchStat { user_id: u1, query: q1 },
-                    PillyEvent::SearchStat { user_id: u2, query: q2 },
+                    PillyEvent::SearchStat {
+                        user_id: u1,
+                        query: q1,
+                    },
+                    PillyEvent::SearchStat {
+                        user_id: u2,
+                        query: q2,
+                    },
                 ) => {
                     assert_eq!(u1, u2);
                     assert_eq!(q1, q2);
                 }
                 (
-                    PillyEvent::AdminAudit { admin_id: a1, action: ac1, target_id: t1 },
-                    PillyEvent::AdminAudit { admin_id: a2, action: ac2, target_id: t2 },
+                    PillyEvent::AdminAudit {
+                        admin_id: a1,
+                        action: ac1,
+                        target_id: t1,
+                    },
+                    PillyEvent::AdminAudit {
+                        admin_id: a2,
+                        action: ac2,
+                        target_id: t2,
+                    },
                 ) => {
                     assert_eq!(a1, a2);
                     assert_eq!(ac1, ac2);

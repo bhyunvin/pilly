@@ -45,10 +45,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// 의약품 데이터 동기화 트리거 (x-admin-key 헤더 검증)
-async fn sync_pills(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> AppResult<Json<Value>> {
+async fn sync_pills(State(state): State<AppState>, headers: HeaderMap) -> AppResult<Json<Value>> {
     let client_key = headers
         .get("x-admin-key")
         .and_then(|v| v.to_str().ok())
@@ -65,10 +62,7 @@ async fn sync_pills(
 }
 
 /// 전체 사용자 목록 조회
-async fn list_users(
-    State(state): State<AppState>,
-    _admin: AdminUser,
-) -> AppResult<Json<Value>> {
+async fn list_users(State(state): State<AppState>, _admin: AdminUser) -> AppResult<Json<Value>> {
     let rows: Vec<(String, String, String, String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
         "SELECT user_id, nickname, role, status, created_at FROM user_profiles ORDER BY created_at DESC",
     )
@@ -298,14 +292,13 @@ async fn get_jit_chat_logs(
         let config_clone = state.config.clone();
         let target_user_id = approval.user_id.clone();
         tokio::spawn(async move {
-            let email_opt: Option<String> = sqlx::query_scalar(
-                "SELECT email FROM neon_auth.\"user\" WHERE id = $1 LIMIT 1",
-            )
-            .bind(&target_user_id)
-            .fetch_optional(&pool_clone)
-            .await
-            .ok()
-            .flatten();
+            let email_opt: Option<String> =
+                sqlx::query_scalar("SELECT email FROM neon_auth.\"user\" WHERE id = $1 LIMIT 1")
+                    .bind(&target_user_id)
+                    .fetch_optional(&pool_clone)
+                    .await
+                    .ok()
+                    .flatten();
 
             if let Some(to_email) = email_opt {
                 if let Err(err) =

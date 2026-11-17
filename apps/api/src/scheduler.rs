@@ -24,10 +24,7 @@ pub fn spawn_cleanup_scheduler(pool: PgPool) {
                     if deleted_ids.is_empty() {
                         tracing::info!("삭제 대상 만료 계정이 없습니다.");
                     } else {
-                        tracing::info!(
-                            "만료된 탈퇴 계정 {}건 물리 삭제 완료",
-                            deleted_ids.len()
-                        );
+                        tracing::info!("만료된 탈퇴 계정 {}건 물리 삭제 완료", deleted_ids.len());
                     }
                 }
                 Err(err) => {

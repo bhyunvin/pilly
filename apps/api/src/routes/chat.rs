@@ -202,8 +202,7 @@ async fn send_message(
                         if let Some(fc) = part.get("functionCall")
                             && let Some(name) = fc["name"].as_str()
                         {
-                            pending_function_call =
-                                Some((name.to_string(), fc["args"].clone()));
+                            pending_function_call = Some((name.to_string(), fc["args"].clone()));
                         } else if let Some(text) = part["text"].as_str() {
                             full_text.push_str(text);
                             let _ = tx.send(Ok(bytes::Bytes::from(text.to_string()))).await;

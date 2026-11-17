@@ -39,8 +39,9 @@ impl FromRequestParts<AppState> for AuthUser {
             .strip_prefix("Bearer ")
             .ok_or_else(|| AppError::Unauthorized("Unauthorized: Missing token".to_string()))?;
 
-        let header = decode_header(token)
-            .map_err(|_| AppError::Unauthorized("Unauthorized: Invalid token header".to_string()))?;
+        let header = decode_header(token).map_err(|_| {
+            AppError::Unauthorized("Unauthorized: Invalid token header".to_string())
+        })?;
 
         let kid = header.kid.unwrap_or_default();
 
@@ -54,7 +55,9 @@ impl FromRequestParts<AppState> for AuthUser {
                 .map_err(|_| AppError::Unauthorized("Unauthorized: JWKS fetch failed".to_string()))?
                 .json()
                 .await
-                .map_err(|_| AppError::Unauthorized("Unauthorized: JWKS parse failed".to_string()))?;
+                .map_err(|_| {
+                    AppError::Unauthorized("Unauthorized: JWKS parse failed".to_string())
+                })?;
 
             for jwk in jwks.keys {
                 if let Some(id) = jwk.common.key_id.clone() {
@@ -163,7 +166,8 @@ mod tests {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://localhost/nonexistent")
             .expect("lazy pool");
-        let producer = EventProducer::connect("127.0.0.1:19999", "iggy", "iggy", pool.clone()).await;
+        let producer =
+            EventProducer::connect("127.0.0.1:19999", "iggy", "iggy", pool.clone()).await;
         let mut config = Config::from_env();
         config.neon_auth_jwks_url = String::new();
 
@@ -184,7 +188,9 @@ mod tests {
         // 1. Authorization 헤더 누락
         let req = Request::builder().uri("/").body(()).unwrap();
         let (mut parts, _) = req.into_parts();
-        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        let err = AuthUser::from_request_parts(&mut parts, &state)
+            .await
+            .unwrap_err();
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
 
         // 2. 위조된/잘못된 형식의 토큰
@@ -194,7 +200,9 @@ mod tests {
             .body(())
             .unwrap();
         let (mut parts, _) = req.into_parts();
-        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        let err = AuthUser::from_request_parts(&mut parts, &state)
+            .await
+            .unwrap_err();
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -221,7 +229,8 @@ mod tests {
             email: "user@test.com".to_string(),
             exp: 1000, // 과거 시간
         };
-        let expired_token = encode(&header, &expired_claims, &EncodingKey::from_secret(secret)).unwrap();
+        let expired_token =
+            encode(&header, &expired_claims, &EncodingKey::from_secret(secret)).unwrap();
 
         let req = Request::builder()
             .header(AUTHORIZATION, format!("Bearer {expired_token}"))
@@ -229,7 +238,9 @@ mod tests {
             .body(())
             .unwrap();
         let (mut parts, _) = req.into_parts();
-        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        let err = AuthUser::from_request_parts(&mut parts, &state)
+            .await
+            .unwrap_err();
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
 
         // 다른 키로 서명된 위조 토큰
@@ -252,7 +263,9 @@ mod tests {
             .body(())
             .unwrap();
         let (mut parts, _) = req.into_parts();
-        let err = AuthUser::from_request_parts(&mut parts, &state).await.unwrap_err();
+        let err = AuthUser::from_request_parts(&mut parts, &state)
+            .await
+            .unwrap_err();
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
     }
 }

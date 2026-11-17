@@ -1,17 +1,9 @@
-use axum::{
-    Json, Router,
-    extract::State,
-    http::StatusCode,
-    routing::get,
-};
+use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
-    db::UserActivityLog,
-    error::AppResult,
-    middleware::auth::AuthUser,
-    mq::PillyEvent,
+    db::UserActivityLog, error::AppResult, middleware::auth::AuthUser, mq::PillyEvent,
     state::AppState,
 };
 

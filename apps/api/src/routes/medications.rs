@@ -72,9 +72,7 @@ async fn create_medication(
     auth_user: AuthUser,
     Json(body): Json<CreateMedicationRequest>,
 ) -> AppResult<(StatusCode, Json<Value>)> {
-    let start_date = body
-        .start_date
-        .unwrap_or_else(|| Utc::now().to_rfc3339());
+    let start_date = body.start_date.unwrap_or_else(|| Utc::now().to_rfc3339());
 
     let med: UserMedication = sqlx::query_as(
         "INSERT INTO user_medications (user_id, name, dosage, frequency, start_date) VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, name, dosage, frequency, start_date, end_date, status, created_at",
@@ -159,7 +157,9 @@ async fn record_medication_history(
             .await?;
 
     if owns.is_none() {
-        return Err(AppError::NotFound("복약 정보를 찾을 수 없습니다.".to_string()));
+        return Err(AppError::NotFound(
+            "복약 정보를 찾을 수 없습니다.".to_string(),
+        ));
     }
 
     let item: MedicationHistoryItem = sqlx::query_as(
@@ -220,7 +220,8 @@ async fn analyze_image(
         }
     }
 
-    let bytes = image_bytes.ok_or_else(|| AppError::BadRequest("image 필드가 필요합니다.".to_string()))?;
+    let bytes =
+        image_bytes.ok_or_else(|| AppError::BadRequest("image 필드가 필요합니다.".to_string()))?;
     let base64_image = BASE64.encode(&bytes);
 
     let url = format!(

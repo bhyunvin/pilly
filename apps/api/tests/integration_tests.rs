@@ -15,12 +15,7 @@ use wiremock::{
     matchers::{method, path_regex},
 };
 
-use pilly_api::{
-    config::Config,
-    create_app,
-    mq::EventProducer,
-    state::AppState,
-};
+use pilly_api::{config::Config, create_app, mq::EventProducer, state::AppState};
 
 #[derive(Serialize)]
 struct TestClaims {
@@ -49,7 +44,9 @@ fn generate_test_jwt(kid: &str, secret: &[u8], user_id: &str, email: &str) -> (J
     (jwk, token)
 }
 
-async fn setup_test_app(gemini_base_url: Option<String>) -> Option<(axum::Router, sqlx::PgPool, String, String)> {
+async fn setup_test_app(
+    gemini_base_url: Option<String>,
+) -> Option<(axum::Router, sqlx::PgPool, String, String)> {
     dotenvy::dotenv().ok();
     let mut config = Config::from_env();
     if config.database_url.is_empty() || config.database_url.contains("nonexistent") {
@@ -109,7 +106,12 @@ async fn setup_test_app(gemini_base_url: Option<String>) -> Option<(axum::Router
     };
 
     let app = create_app(state);
-    Some((app, pool, format!("{test_user_id}|{user_token}"), format!("{test_admin_id}|{admin_token}")))
+    Some((
+        app,
+        pool,
+        format!("{test_user_id}|{user_token}"),
+        format!("{test_admin_id}|{admin_token}"),
+    ))
 }
 
 async fn cleanup_test_users(pool: &sqlx::PgPool, user_id: &str, admin_id: &str) {
@@ -153,7 +155,12 @@ async fn test_health_and_search_routes() {
     // 1. /health
     let res = app
         .clone()
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert!(res.status() == StatusCode::OK || res.status() == StatusCode::FORBIDDEN);
@@ -300,7 +307,8 @@ async fn test_chat_function_calling_with_wiremock_gemini() {
         .mount(&mock_server)
         .await;
 
-    let Some((app, pool, user_info, admin_info)) = setup_test_app(Some(mock_server.uri())).await else {
+    let Some((app, pool, user_info, admin_info)) = setup_test_app(Some(mock_server.uri())).await
+    else {
         return;
     };
     let (user_id, user_token) = user_info.split_once('|').unwrap();
@@ -315,7 +323,9 @@ async fn test_chat_function_calling_with_wiremock_gemini() {
                 .uri("/api/v1/chat/sessions")
                 .header(AUTHORIZATION, format!("Bearer {user_token}"))
                 .header("content-type", "application/json")
-                .body(Body::from(json!({ "title": "Function Calling 테스트" }).to_string()))
+                .body(Body::from(
+                    json!({ "title": "Function Calling 테스트" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await

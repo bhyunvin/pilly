@@ -8,11 +8,7 @@ use serde_json::{Value, json};
 use sqlx::QueryBuilder;
 
 use crate::{
-    db::PillCatalog,
-    error::AppResult,
-    middleware::auth::AuthUser,
-    mq::PillyEvent,
-    state::AppState,
+    db::PillCatalog, error::AppResult, middleware::auth::AuthUser, mq::PillyEvent, state::AppState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -36,10 +32,9 @@ pub fn router() -> Router<AppState> {
 
 /// 사이트맵 생성을 위한 공개 의약품 ID 목록 조회
 async fn get_sitemap(State(state): State<AppState>) -> AppResult<Json<Value>> {
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT item_seq FROM pill_catalog LIMIT 10000")
-            .fetch_all(&state.pool)
-            .await?;
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT item_seq FROM pill_catalog LIMIT 10000")
+        .fetch_all(&state.pool)
+        .await?;
 
     let pills: Vec<SitemapItem> = rows
         .into_iter()

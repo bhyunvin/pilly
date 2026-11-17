@@ -124,7 +124,12 @@ async fn create_inquiry(
                 state.config.cloudinary_cloud_name
             );
 
-            if let Ok(res) = state.http_client.post(&upload_url).multipart(form).send().await
+            if let Ok(res) = state
+                .http_client
+                .post(&upload_url)
+                .multipart(form)
+                .send()
+                .await
                 && let Ok(json_res) = res.json::<Value>().await
                 && let Some(secure_url) = json_res["secure_url"].as_str()
             {
