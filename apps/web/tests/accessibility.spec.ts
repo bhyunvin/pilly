@@ -68,4 +68,32 @@ test.describe('Accessibility (A11y) Audit', () => {
 
     expect(accessibilityScanResults.violations).toEqual([]);
   });
+
+  test('의약품 검색 페이지(/search)의 접근성 준수 사항을 확인하는가?', async ({ page }) => {
+    await page.goto('/search');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+
+    expect(accessibilityScanResults.violations).toEqual([]);
+  });
+
+  test('복약 관리 페이지(/medications)의 접근성 준수 사항을 확인하는가?', async ({ page }) => {
+    await page.route('**/api/v1/medications', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, medications: [] }),
+      });
+    });
+
+    await page.goto('/medications');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+
+    expect(accessibilityScanResults.violations).toEqual([]);
+  });
 });
