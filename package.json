@@ -15,16 +15,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" && (cd apps/api && cargo fmt --all)",
     "ready": "bun run format && bun run lint",
     "update:deps": "bun update && (cd apps/api && cargo update)",
-    "audit": "bun audit && (cd apps/api && cargo audit)",
+    "audit": "bun audit --omit=dev && (cd apps/api && cargo audit)",
     "typecheck": "turbo run typecheck",
     "test:api": "cd apps/api && bun test --parallel",
     "test:web": "cd apps/web && bun test --parallel",
     "test:changed": "turbo run test -- --changed",
-    "test": "turbo run test",
-    "perf": "unlighthouse --site http://localhost:3000"
+    "test": "turbo run test"
   },
   "devDependencies": {
-    "@unlighthouse/cli": "^0.19.1",
     "prettier": "3.10.1",
     "turbo": "^2.11.12"
   },

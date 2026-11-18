@@ -17,7 +17,7 @@ path = "src/bin/sync_pills.rs"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 axum = { version = "0.8", features = ["multipart", "macros"] }
-tower-http = { version = "0.6", features = ["cors", "compression-gzip", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "compression-gzip", "trace"] }
 
 # 전역 메모리 할당자
 mimalloc = "0.1"
@@ -25,13 +25,13 @@ mimalloc = "0.1"
 # 직렬화
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bincode = "1.3"
+postcard = { version = "1", features = ["alloc"] }
 
 # 데이터베이스 (SQLx PostgreSQL)
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "migrate"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "migrate"] }
 
 # 메시지 스트리밍 (Apache Iggy)
-iggy = "0.6"
+iggy = "0.12"
 
 # 인메모리 캐시
 dashmap = "6"
@@ -42,8 +42,8 @@ jsonwebtoken = "9"
 aes-gcm = "0.10"
 hex = "0.4"
 rand = "0.8"
-base64 = "0.22"
-sha1 = "0.10"
+base64 = "0.23"
+sha1 = "0.11"
 
 # HTTP 클라이언트 (Gemini AI, 공공데이터 API, Cloudinary, JWKS)
 reqwest = { version = "0.12", features = ["json", "multipart", "stream", "rustls-tls"] }

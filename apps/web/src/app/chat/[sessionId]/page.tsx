@@ -87,6 +87,7 @@ const ChatVisualModal = dynamic(
 );
 
 interface Message {
+  id: string;
   role: 'user' | 'ai';
   content: string;
 }
@@ -97,6 +98,7 @@ interface ChatLog {
 }
 
 interface AnalyzedMed {
+  id?: string;
   name: string;
   dosage: string;
   frequency: string;
@@ -152,6 +154,7 @@ export default function ChatSessionPage(): React.ReactNode {
       const history: Message[] = [];
       if (result.logs.length === 0) {
         history.push({
+          id: crypto.randomUUID(),
           role: 'ai',
           content:
             '안녕하세요! Pilly AI 복약 가이드입니다. 약물 복용법이나 주의사항에 대해 무엇이든 물어보세요.',
@@ -159,8 +162,8 @@ export default function ChatSessionPage(): React.ReactNode {
       } else {
         result.logs.forEach((log) => {
           history.push(
-            { role: 'user', content: log.prompt },
-            { role: 'ai', content: log.response },
+            { id: crypto.randomUUID(), role: 'user', content: log.prompt },
+            { id: crypto.randomUUID(), role: 'ai', content: log.response },
           );
         });
       }
@@ -186,7 +189,7 @@ export default function ChatSessionPage(): React.ReactNode {
   }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (messages.length > 0 && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
@@ -223,13 +226,13 @@ export default function ChatSessionPage(): React.ReactNode {
     if (!input.trim() || isLoading) return;
 
     const text = input;
-    const userMessage: Message = { role: 'user', content: text };
+    const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: text };
     const newMessages = [...messages, userMessage];
 
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: 'ai', content: '' }]);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'ai', content: '' }]);
 
     try {
       const historyPayload = newMessages.slice(-10).map((msg) => ({
@@ -299,7 +302,13 @@ export default function ChatSessionPage(): React.ReactNode {
       if (!res.ok) throw new Error('분석 실패');
       const result = await res.json();
       if (result.success) {
-        setAnalyzedMeds((result.data as AnalyzedMed[]).map((m) => ({ ...m, checked: true })));
+        setAnalyzedMeds(
+          (result.data as AnalyzedMed[]).map((m) => ({
+            ...m,
+            id: crypto.randomUUID(),
+            checked: true,
+          })),
+        );
         setIsVisionModalOpen(true);
       }
     } catch (err) {
@@ -433,9 +442,9 @@ export default function ChatSessionPage(): React.ReactNode {
 
       <Card className="flex-1 overflow-hidden flex flex-col shadow-inner bg-muted/10">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4" aria-live="polite">
-          {messages.map((msg, idx) => (
+          {messages.map((msg) => (
             <div
-              key={`${msg.role}-${idx}`}
+              key={msg.id}
               className={cn(
                 'flex items-start gap-3 max-w-[85%]',
                 msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',

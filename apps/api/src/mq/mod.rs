@@ -1,15 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use iggy::client::{Client, MessageClient, StreamClient, TopicClient, UserClient};
-use iggy::clients::client::IggyClient;
-use iggy::compression::compression_algorithm::CompressionAlgorithm;
-use iggy::consumer::Consumer;
-use iggy::error::IggyError;
-use iggy::identifier::Identifier;
-use iggy::messages::poll_messages::PollingStrategy;
-use iggy::messages::send_messages::{Message, Partitioning};
-use iggy::utils::expiry::IggyExpiry;
+use iggy::prelude::*;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 use tokio::sync::{Mutex, RwLock};
@@ -191,7 +183,9 @@ impl EventProducer {
         // 주의: get_stream/get_topic은 미존재 시 Err가 아닌 Ok(None)을 반환한다.
         let stream_id = Identifier::named(STREAM_NAME)?;
         if client.get_stream(&stream_id).await?.is_none() {
-            client.create_stream(STREAM_NAME, None).await?;
+            client
+                .create_stream(STREAM_NAME, &StreamCreateOptions::default())
+                .await?;
         }
 
         let topic_id = Identifier::named(ACTIVITY_TOPIC)?;
@@ -200,12 +194,12 @@ impl EventProducer {
                 .create_topic(
                     &stream_id,
                     ACTIVITY_TOPIC,
-                    1,
-                    CompressionAlgorithm::None,
-                    None,
-                    None,
-                    IggyExpiry::NeverExpire,
-                    None.into(),
+                    &TopicCreateOptions {
+                        partitions_count: Some(1),
+                        compression_algorithm: Some(CompressionAlgorithm::None),
+                        message_expiry: Some(IggyExpiry::NeverExpire),
+                        ..Default::default()
+                    },
                 )
                 .await?;
         }
@@ -213,18 +207,20 @@ impl EventProducer {
         Ok(client)
     }
 
-    /// 이벤트를 bincode 바이너리로 직렬화하여 Iggy 스트림에 초고속 발행합니다.
+    /// 이벤트를 postcard 바이너리로 직렬화하여 Iggy 스트림에 초고속 발행합니다.
     /// Iggy가 오프라인이거나 발행에 실패한 경우 이벤트 유실 방지를 위해 직접 처리(DB 폴백)합니다.
     pub async fn publish(&self, event: PillyEvent) {
         let client_opt = self.client.read().await.clone();
         if let Some(client) = client_opt
-            && let Ok(payload) = bincode::serialize(&event)
+            && let Ok(payload) = postcard::to_allocvec(&event)
             && let (Ok(stream_id), Ok(topic_id)) = (
                 Identifier::named(STREAM_NAME),
                 Identifier::named(ACTIVITY_TOPIC),
             )
         {
-            let message = Message::new(None, payload.into(), None);
+            let Ok(message) = IggyMessage::builder().payload(payload.into()).build() else {
+                return;
+            };
             let mut messages = vec![message];
 
             match client
@@ -406,18 +402,20 @@ pub fn spawn_batch_consumer(
                     .poll_messages(
                         &stream_id,
                         &topic_id,
-                        Some(PARTITION_ID),
+                        PARTITION_ID,
                         &consumer,
                         &PollingStrategy::next(),
-                        100,
-                        true,
+                        PollOptions {
+                            count: 100,
+                            ..Default::default()
+                        },
                     )
                     .await
                 {
                     Ok(polled) if !polled.messages.is_empty() => {
                         let mut activities = Vec::new();
                         for msg in polled.messages {
-                            let Ok(event) = bincode::deserialize::<PillyEvent>(&msg.payload) else {
+                            let Ok(event) = postcard::from_bytes::<PillyEvent>(&msg.payload) else {
                                 tracing::warn!("역직렬화할 수 없는 Iggy 메시지를 건너뜁니다.");
                                 continue;
                             };
@@ -483,18 +481,18 @@ mod tests {
     }
 
     #[test]
-    fn test_all_events_bincode_roundtrip() {
+    fn test_all_events_postcard_roundtrip() {
         for event in all_events() {
-            let encoded = bincode::serialize(&event).expect("직렬화 성공");
-            let decoded: PillyEvent = bincode::deserialize(&encoded).expect("역직렬화 성공");
+            let encoded = postcard::to_allocvec(&event).expect("직렬화 성공");
+            let decoded: PillyEvent = postcard::from_bytes(&encoded).expect("역직렬화 성공");
             assert_eq!(event, decoded);
         }
     }
 
     #[test]
-    fn test_bincode_rejects_corrupted_payload() {
-        assert!(bincode::deserialize::<PillyEvent>(&[0xFF, 0xFF, 0xFF, 0xFF, 0x01]).is_err());
-        assert!(bincode::deserialize::<PillyEvent>(&[]).is_err());
+    fn test_postcard_rejects_corrupted_payload() {
+        assert!(postcard::from_bytes::<PillyEvent>(&[0xFF, 0xFF, 0xFF, 0xFF, 0x01]).is_err());
+        assert!(postcard::from_bytes::<PillyEvent>(&[]).is_err());
     }
 
     #[test]

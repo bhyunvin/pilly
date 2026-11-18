@@ -19,12 +19,12 @@
         "preset": "recommended"
       },
       "correctness": {
-        "useExhaustiveDependencies": "warn",
+        "useExhaustiveDependencies": "error",
         "noUnusedVariables": "error"
       },
       "suspicious": {
         "noExplicitAny": "error",
-        "noArrayIndexKey": "warn"
+        "noArrayIndexKey": "error"
       }
     }
   },

@@ -4,12 +4,12 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.4.6-black?logo=next.js)](https://nextjs.org/)
 [![Rust](https://img.shields.io/badge/Rust-Edition_2024-000000?logo=rust)](https://www.rust-lang.org/)
 [![Axum](https://img.shields.io/badge/Axum-0.8-black?logo=rust)](https://github.com/tokio-rs/axum)
-[![Apache Iggy](https://img.shields.io/badge/Apache_Iggy-0.6-ff6600)](https://iggy.apache.org/)
+[![Apache Iggy](https://img.shields.io/badge/Apache_Iggy-0.12-ff6600)](https://iggy.apache.org/)
 <br />
 [![Turborepo](https://img.shields.io/badge/Turborepo-2.11.12-ef4444?logo=turborepo)](https://turbo.build/repo)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.0.2-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.3.5-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
-[![SQLx](<https://img.shields.io/badge/SQLx-0.8_(PostgreSQL)-336791?logo=postgresql>)](https://github.com/launchbadge/sqlx)
+[![SQLx](<https://img.shields.io/badge/SQLx-0.9_(PostgreSQL)-336791?logo=postgresql>)](https://github.com/launchbadge/sqlx)
 [![Vitest](https://img.shields.io/badge/Vitest-5.1.0-6e9f18?logo=vitest)](https://vitest.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.65.1-2ead33?logo=playwright)](https://playwright.dev/)
 

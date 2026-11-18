@@ -1,5 +1,5 @@
 # Build Stage
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
@@ -10,7 +10,7 @@ COPY src ./src
 RUN cargo build --release --bin pilly-api --bin sync_pills
 
 # Iggy Server Binary Stage
-FROM iggyrs/iggy:0.4.210 AS iggy
+FROM iggyrs/iggy:0.4.214 AS iggy
 
 # Runtime Stage
 FROM debian:bookworm-slim

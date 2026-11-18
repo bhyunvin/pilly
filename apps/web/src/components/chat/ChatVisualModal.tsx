@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 
 interface AnalyzedMed {
+  id?: string;
   name: string;
   dosage: string;
   frequency: string;
@@ -51,7 +52,7 @@ export function ChatVisualModal({
         <div className="max-h-[60vh] overflow-y-auto space-y-4 py-4">
           {analyzedMeds.map((med, idx) => (
             <div
-              key={`${med.name}-${idx}`}
+              key={med.id ?? `${med.name}-${med.dosage}-${med.frequency}`}
               className="flex items-start space-x-3 border p-3 rounded-lg"
             >
               <Checkbox

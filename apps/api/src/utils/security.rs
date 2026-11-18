@@ -26,9 +26,9 @@ pub fn encrypt(text: &str, key_hex: &str) -> String {
 
     let mut iv = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut iv);
-    let nonce = Nonce::from_slice(&iv);
+    let nonce = Nonce::from(iv);
 
-    match cipher.encrypt(nonce, text.as_bytes()) {
+    match cipher.encrypt(&nonce, text.as_bytes()) {
         Ok(mut ciphertext_with_tag) => {
             // aes-gcm은 암호문 뒤에 16바이트 AuthTag를 붙여서 반환함
             let tag_split_idx = ciphertext_with_tag.len().saturating_sub(16);
@@ -75,11 +75,14 @@ pub fn decrypt(text: &str, key_hex: &str) -> String {
         return text.to_string();
     };
 
-    let nonce = Nonce::from_slice(&iv);
+    let Ok(iv_arr): Result<[u8; 12], _> = iv.try_into() else {
+        return text.to_string();
+    };
+    let nonce = Nonce::from(iv_arr);
     let mut payload = ciphertext;
     payload.extend_from_slice(&auth_tag);
 
-    match cipher.decrypt(nonce, payload.as_ref()) {
+    match cipher.decrypt(&nonce, payload.as_ref()) {
         Ok(plaintext) => String::from_utf8(plaintext).unwrap_or_else(|_| text.to_string()),
         Err(err) => {
             tracing::error!("복호화 실패: {:?}", err);
