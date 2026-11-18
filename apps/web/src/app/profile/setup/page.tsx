@@ -1,9 +1,7 @@
 'use client';
 
-import { useState, type SyntheticEvent } from 'react';
-import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
-import { authClient } from '@/lib/auth';
+import { type SyntheticEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,6 +13,9 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useApi } from '@/hooks/useApi';
+import { authClient } from '@/lib/auth';
+import { logger } from '@/utils/logger';
 
 /**
  * 초기 프로필 설정 페이지 컴포넌트입니다.
@@ -23,6 +24,7 @@ import { Label } from '@/components/ui/label';
  * @returns 프로필 설정 페이지 렌더링 결과
  */
 export default function ProfileSetupPage(): React.ReactNode {
+  const { apiFetch } = useApi();
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,17 +50,10 @@ export default function ProfileSetupPage(): React.ReactNode {
       }
 
       // 2. 백엔드 프로필 생성 API 호출
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionData.session.id}`, // 실제 환경에 따라 세션 토큰 확인 필요
-          },
-          body: JSON.stringify({ nickname }),
-        },
-      );
+      const response = await apiFetch('/profile', {
+        method: 'POST',
+        body: JSON.stringify({ nickname }),
+      });
 
       if (response.status === 409) {
         setError('이미 사용 중인 닉네임입니다.');

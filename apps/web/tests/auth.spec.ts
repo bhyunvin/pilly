@@ -6,7 +6,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
 
     // 2. 타이틀 확인
-    await expect(page.getByText('Pilly 시작하기')).toBeVisible();
+    await expect(page.getByText('스마트한 복약 관리의 시작, Pilly')).toBeVisible();
 
     // 3. 이메일 입력 필드 존재 여부 확인
     const emailInput = page.locator('input[type="email"]');

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { ArrowRight, MessageCircle, Search, ShieldCheck, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, MessageCircle, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
-import Link from 'next/link';
 
 /**
  * Pilly 메인 랜딩 페이지 컴포넌트입니다.

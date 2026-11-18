@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: pilly-postgres
+    profiles: ["local-db"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-pilly}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pilly}
+      POSTGRES_DB: ${DB_NAME:-pilly}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pilly} -d ${DB_NAME:-pilly}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  iggy:
+    image: iggyrs/iggy:latest
+    container_name: pilly-iggy
+    restart: unless-stopped
+    ports:
+      - "8090:8090" # TCP
+      - "8080:8080" # HTTP
+      - "3000:3000" # QUIC
+    volumes:
+      - iggy_data:/local_data
+    environment:
+      IGGY_TCP_ENABLED: "true"
+      IGGY_TCP_ADDRESS: "0.0.0.0:8090"
+
+volumes:
+  postgres_data:
+  iggy_data:

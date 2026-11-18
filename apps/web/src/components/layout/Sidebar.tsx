@@ -1,25 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { logger } from '@/utils/logger';
-import Link from 'next/link';
 import {
-  Home,
-  Search,
-  MessageCircle,
-  User,
-  Pill,
-  Edit2,
   Check,
-  X,
+  Edit2,
+  Home,
+  MessageCircle,
+  Pill,
+  Search,
   ShieldAlert,
+  User,
   UserMinus,
+  X,
 } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { authClient } from '@/lib/auth';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useApi } from '@/hooks/useApi';
+import { authClient } from '@/lib/auth';
+import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
 
 interface ChatSession {
   id: number;
@@ -36,6 +37,7 @@ interface ChatSession {
  */
 export function Sidebar() {
   const pathname = usePathname();
+  const { apiFetch } = useApi();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -52,19 +54,12 @@ export function Sidebar() {
    * @description 현재 로그인한 사용자의 프로필 정보를 조회하여 관리자 권한 여부를 확인합니다.
    * @async
    */
-  const fetchProfile = async (): Promise<void> => {
+  const fetchProfile = useCallback(async (): Promise<void> => {
     try {
       const { data: sessionData } = await authClient.getSession();
       if (!sessionData) return;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
-        {
-          headers: {
-            Authorization: `Bearer ${sessionData.session.id}`,
-          },
-        },
-      );
+      const response = await apiFetch('/profile');
       const result = await response.json();
       if (result.success && result.data) {
         setIsAdmin(result.data.role === 'ADMIN');
@@ -72,23 +67,18 @@ export function Sidebar() {
     } catch (err) {
       logger.error({ err }, 'Error fetching profile');
     }
-  };
+  }, [apiFetch]);
 
   /**
    * @description 최근 생성된 채팅 세션 목록을 API를 통해 조회합니다.
    * @async
    */
-  const fetchSessions = async (): Promise<void> => {
+  const fetchSessions = useCallback(async (): Promise<void> => {
     try {
       const { data: sessionData } = await authClient.getSession();
       if (!sessionData) return;
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/chat/sessions`,
-        {
-          headers: { Authorization: `Bearer ${sessionData.session.id}` },
-        },
-      );
+      const res = await apiFetch('/chat/sessions');
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
@@ -96,15 +86,17 @@ export function Sidebar() {
     } catch (err) {
       logger.error({ err }, 'Error fetching sessions');
     }
-  };
+  }, [apiFetch]);
 
   useEffect(() => {
-    fetchProfile();
-    fetchSessions();
+    queueMicrotask(() => {
+      void fetchProfile();
+      void fetchSessions();
+    });
 
     globalThis.addEventListener('refresh-sessions', fetchSessions);
     return () => globalThis.removeEventListener('refresh-sessions', fetchSessions);
-  }, []);
+  }, [fetchProfile, fetchSessions]);
 
   /**
    * @description 특정 채팅 세션의 제목 수정을 시작합니다.
@@ -128,18 +120,10 @@ export function Sidebar() {
     setEditingId(null);
 
     try {
-      const { data: sessionData } = await authClient.getSession();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/chat/sessions/${id}/title`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionData?.session.id}`,
-          },
-          body: JSON.stringify({ title: editTitle }),
-        },
-      );
+      const res = await apiFetch(`/chat/sessions/${id}/title`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: editTitle }),
+      });
       if (!res.ok) throw new Error('수정 실패');
     } catch (err) {
       logger.error({ err }, 'Failed to update session title:');

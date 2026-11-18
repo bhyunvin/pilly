@@ -37,3 +37,11 @@ test-results
 
 # Drizzle generated files
 drizzle/
+
+# Rust build artifacts
+target/
+**/target/
+
+# Local Apache Iggy data
+.iggy-data/
+local_data/

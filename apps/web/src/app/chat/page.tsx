@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
+import { Bot, Loader2, MessageCircle, MessageSquarePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useApi } from '@/hooks/useApi';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, MessageSquarePlus, MessageCircle, Loader2 } from 'lucide-react';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 interface ChatSession {
   id: number;
@@ -48,7 +48,9 @@ export default function ChatSessionsPage(): React.ReactNode {
   }, [apiFetch]);
 
   useEffect(() => {
-    fetchSessions();
+    queueMicrotask(() => {
+      void fetchSessions();
+    });
   }, [fetchSessions]);
 
   /**
@@ -83,7 +85,7 @@ export default function ChatSessionsPage(): React.ReactNode {
 
   if (isLoading) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="animate-spin" />
       </div>
     );

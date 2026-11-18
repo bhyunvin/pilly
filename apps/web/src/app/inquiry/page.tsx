@@ -1,13 +1,8 @@
 'use client';
 
+import { CheckCircle2, Loader2, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
-import { logger } from '@/utils/logger';
-import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -16,7 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { MessageSquare, CheckCircle2, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 /**
  * 1:1 문의 페이지 컴포넌트입니다.
@@ -47,13 +47,14 @@ export default function InquiryPage(): React.ReactNode {
     setError('');
 
     try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('content', content);
+      formData.append('allow_chat_access', allowChatAccess ? 'true' : 'false');
+
       const response = await apiFetch('/inquiry', {
         method: 'POST',
-        body: JSON.stringify({
-          title,
-          content,
-          allow_chat_access: allowChatAccess,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {

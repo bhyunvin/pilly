@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
-import { useApi } from '@/hooks/useApi';
+import { Loader2, Pill as PillIcon, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Pill as PillIcon, Plus, Trash2, Loader2 } from 'lucide-react';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 interface Medication {
   id: string;
@@ -51,7 +51,9 @@ export default function MedicationsPage() {
   }, [apiFetch]);
 
   useEffect(() => {
-    fetchMedications();
+    queueMicrotask(() => {
+      void fetchMedications();
+    });
   }, [fetchMedications]);
 
   /**
@@ -133,6 +135,7 @@ export default function MedicationsPage() {
         {medications.map((med) => (
           <Card key={med.id} className="relative group hover:border-primary/50 transition-colors">
             <button
+              type="button"
               onClick={() => handleDelete(med.id)}
               className="absolute top-3 right-3 p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
               aria-label={`${med.name} 삭제`}

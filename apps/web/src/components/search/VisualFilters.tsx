@@ -64,6 +64,7 @@ export function VisualFilters({
         <div className="flex flex-wrap items-center gap-4">
           {shapes.map((s) => (
             <button
+              type="button"
               key={s.name}
               onClick={() => onSelectShape(selectedShape === s.name ? '' : s.name)}
               className="flex flex-col items-center gap-1 group"
@@ -101,6 +102,7 @@ export function VisualFilters({
         <div className="flex flex-wrap gap-3">
           {colors.map((c) => (
             <button
+              type="button"
               key={c.name}
               onClick={() => onSelectColor(selectedColor === c.name ? '' : c.name)}
               className="flex flex-col items-center gap-1"

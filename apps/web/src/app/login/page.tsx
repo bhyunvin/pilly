@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, type SyntheticEvent } from 'react';
+import { ArrowRight, Mail } from 'lucide-react';
 import Link from 'next/link';
-import { Mail, ArrowRight } from 'lucide-react';
-import { logger } from '@/utils/logger';
-import { authClient } from '@/lib/auth';
+import { type SyntheticEvent, useState } from 'react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { authClient } from '@/lib/auth';
+import { logger } from '@/utils/logger';
 
 /**
  * @description 인증 중심의 세련된 로그인 페이지 컴포넌트입니다.
@@ -71,7 +71,7 @@ export default function LoginPage(): React.ReactNode {
       <div className="absolute top-6 right-6">
         <ThemeToggle />
       </div>
-      <div className="w-full max-w-[400px] space-y-6">
+      <div className="w-full max-w-100 space-y-6">
         <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
           <CardHeader className="space-y-2 text-center pb-8 border-b border-border/50">
             <CardTitle className="text-3xl font-extrabold tracking-tight">로그인</CardTitle>

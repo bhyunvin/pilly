@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { logger } from '@/utils/logger';
-import { useApi } from '@/hooks/useApi';
-import { useRouter } from 'next/navigation';
-import { authClient } from '@/lib/auth';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useApi } from '@/hooks/useApi';
+import { authClient } from '@/lib/auth';
+import { logger } from '@/utils/logger';
 
 /**
  * 계정 복구 페이지 컴포넌트입니다.
@@ -54,7 +54,9 @@ export default function RestorePage(): React.ReactNode {
   }, [router, apiFetch]);
 
   useEffect(() => {
-    fetchProfile();
+    queueMicrotask(() => {
+      void fetchProfile();
+    });
   }, [fetchProfile]);
 
   /**
@@ -94,7 +96,7 @@ export default function RestorePage(): React.ReactNode {
   );
   if (isLoading) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="animate-spin" aria-hidden="true" />
       </div>
     );

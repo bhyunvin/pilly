@@ -2,14 +2,14 @@
 
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { User, AlertCircle, History } from 'lucide-react';
-import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AlertCircle, History, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 interface RestrictionHistory {
   id: number;
@@ -148,7 +148,7 @@ export function UserDetailSheet({
             {selectedUser.restrictionHistory && selectedUser.restrictionHistory.length > 0 ? (
               selectedUser.restrictionHistory.map((h) => (
                 <div key={h.id} className="relative space-y-1">
-                  <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-muted border-2 border-background" />
+                  <div className="absolute -left-5.25 top-1.5 w-3 h-3 rounded-full bg-muted border-2 border-background" />
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(h.createdAt), 'yyyy. MM. dd. HH:mm', { locale: ko })}
                   </p>

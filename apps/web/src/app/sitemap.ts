@@ -1,5 +1,5 @@
-import { MetadataRoute } from 'next';
-import { api } from '@/lib/api';
+import type { MetadataRoute } from 'next';
+import { apiFetchJson } from '@/lib/api';
 import { logger } from '@/utils/logger';
 
 /**
@@ -16,9 +16,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     // 실제 백엔드 API를 호출하여 검색 엔진에 노출할 퍼블릭 의약품 목록(pillCatalog)을 가져옵니다.
-    // Elysia 라우트 그룹 구조에 따라 .api.v1.search 형태로 호출합니다.
-    const { data, error } = await api.api.v1.search.sitemap.get();
-    
+    const { data, error } = await apiFetchJson<{
+      success: boolean;
+      pills: { itemSeq: string }[];
+    }>('/api/v1/search/sitemap');
+
     if (!error && data?.success) {
       drugSitemaps = data.pills.map((pill: { itemSeq: string }) => ({
         url: `${baseUrl}/medications/${pill.itemSeq}`,

@@ -1,5 +1,5 @@
-import { createAuthClient } from 'better-auth/react';
 import { magicLinkClient } from 'better-auth/client/plugins';
+import { createAuthClient } from 'better-auth/react';
 
 /**
  * @description Better-Auth 라이브러리를 기반으로 구성된 인증 클라이언트 인스턴스입니다.

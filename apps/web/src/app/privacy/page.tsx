@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 /**
  * 개인정보 및 민감정보 처리방침 페이지 컴포넌트입니다.

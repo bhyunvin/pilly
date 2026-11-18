@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Geist } from 'next/font/google';
-import { cn } from '@/lib/utils';
-import { ThemeProvider } from '@/components/theme-provider';
-import { AppShell } from '@/components/layout/AppShell';
-import { ErrorProvider } from '@/components/providers/ErrorProvider';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Geist } from 'next/font/google';
+import { AppShell } from '@/components/layout/AppShell';
+import { ErrorProvider } from '@/components/providers/ErrorProvider';
+import { ThemeProvider } from '@/components/theme-provider';
+import { cn } from '@/lib/utils';
 
 const geist = Geist({
   subsets: ['latin'],
@@ -120,6 +120,8 @@ export default function RootLayout({
   return (
     <html lang="ko" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
       <head>
+        <meta name="color-scheme" content="light dark" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="manifest" href="/manifest.json" />
@@ -127,10 +129,16 @@ export default function RootLayout({
           rel="preload"
           as="style"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+          integrity="sha384-ei/b2Mz3F5J8nqTvpKS89CkzDCuD7Cc+/F+OsaPUKItzHgLNKnGq3rjtYq/B7RnO"
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
         />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+          integrity="sha384-ei/b2Mz3F5J8nqTvpKS89CkzDCuD7Cc+/F+OsaPUKItzHgLNKnGq3rjtYq/B7RnO"
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
         />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased font-pretendard">

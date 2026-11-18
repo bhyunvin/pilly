@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { logger } from '@/utils/logger';
+import type React from 'react';
+import { useEffect } from 'react';
+import { useApi } from '@/hooks/useApi';
 import { authClient } from '@/lib/auth';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
+import { logger } from '@/utils/logger';
 import { BottomNav } from './BottomNav';
 import { Footer } from './Footer';
+import { Header } from './Header';
+import { Sidebar } from './Sidebar';
 
 /**
  * @description 애플리케이션의 공통 레이아웃을 정의하는 셸 컴포넌트입니다.
@@ -20,6 +22,7 @@ import { Footer } from './Footer';
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
+  const { apiFetch } = useApi();
 
   useEffect(() => {
     const checkRestriction = async () => {
@@ -38,14 +41,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         const { data: sessionData } = await authClient.getSession();
         if (!sessionData) return;
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
-          {
-            headers: {
-              Authorization: `Bearer ${sessionData.session.id}`,
-            },
-          },
-        );
+        const response = await apiFetch('/profile');
 
         if (response.ok) {
           const result = await response.json();
@@ -67,8 +63,8 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       }
     };
 
-    checkRestriction();
-  }, [pathname, router]);
+    void checkRestriction();
+  }, [pathname, router, apiFetch]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 

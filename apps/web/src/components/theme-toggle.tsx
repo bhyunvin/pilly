@@ -1,8 +1,8 @@
 'use client';
 
-import * as React from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
 
@@ -16,12 +16,11 @@ import { Button } from '@/components/ui/button';
  */
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  // 클라이언트 사이드 마운트 확인 (Hydration mismatch 방지)
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   /**
    * 시스템 테마를 고려하여 현재 테마와 반대되는 테마로 전환합니다.

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { logger } from '@/utils/logger';
+import { AlertCircle, Bot, Clock, Loader2, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { authClient } from '@/lib/auth';
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bot, User, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 interface ChatLog {
   id: number;
@@ -24,6 +24,7 @@ interface ChatLog {
 export default function AdminChatViewPage(): React.ReactNode {
   const params = useParams();
   const uuid = params.uuid as string;
+  const { apiFetch } = useApi();
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,15 +37,7 @@ export default function AdminChatViewPage(): React.ReactNode {
      */
     const fetchChatLogs = async () => {
       try {
-        const { data: sessionData } = await authClient.getSession();
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/admin/users/chatting/${uuid}`,
-          {
-            headers: {
-              Authorization: `Bearer ${sessionData?.session.id}`,
-            },
-          },
-        );
+        const response = await apiFetch(`/admin/chat/${uuid}`);
 
         if (response.status === 403) {
           setError('접근 권한이 없거나 열람 유효시간(24시간)이 만료되었습니다.');
@@ -65,8 +58,8 @@ export default function AdminChatViewPage(): React.ReactNode {
       }
     };
 
-    if (uuid) fetchChatLogs();
-  }, [uuid]);
+    if (uuid) void fetchChatLogs();
+  }, [uuid, apiFetch]);
 
   if (isLoading) {
     return (

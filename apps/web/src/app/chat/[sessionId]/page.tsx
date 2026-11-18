@@ -1,28 +1,74 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
-import { useParams, useRouter } from 'next/navigation';
-import { useApi } from '@/hooks/useApi';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import type DOMPurify from 'dompurify';
 import {
-  Bot,
-  User,
-  Send,
-  Loader2,
   ArrowLeft,
-  HelpCircle,
+  Bot,
   Camera,
+  HelpCircle,
+  Loader2,
+  Send,
+  User,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import dynamic from 'next/dynamic';
+import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useApi } from '@/hooks/useApi';
+import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
+
+let domPurifyPromise: Promise<typeof DOMPurify> | undefined;
+
+/**
+ * 네이티브 Sanitizer API 미지원 브라우저를 위해 DOMPurify를 지연 로드합니다.
+ */
+function loadDOMPurify() {
+  domPurifyPromise ??= import('dompurify').then((mod) => mod.default ?? mod);
+  return domPurifyPromise;
+}
+
+/**
+ * 마크다운을 HTML로 변환한 뒤 네이티브 Sanitizer API(`setHTML`)를 우선 사용하여 안전하게 렌더링합니다.
+ * 미지원 브라우저에서는 DOMPurify를 동적으로 로드해 폴백합니다.
+ */
+function SanitizedMarkdown({ content }: { readonly content: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let cancelled = false;
+    const rawHtml = marked.parse(content) as string;
+
+    if ('setHTML' in Element.prototype) {
+      (el as HTMLDivElement & { setHTML: (html: string) => void }).setHTML(rawHtml);
+    } else {
+      loadDOMPurify()
+        .then((DOMPurify) => {
+          if (!cancelled && containerRef.current) {
+            containerRef.current.innerHTML = DOMPurify.sanitize(rawHtml);
+          }
+        })
+        .catch((err) => {
+          logger.error({ err }, 'Failed to load DOMPurify');
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [content]);
+
+  return <div ref={containerRef} className="prose prose-sm max-w-none dark:prose-invert" />;
+}
 
 const ChatInquiryModal = dynamic(
   () => import('@/components/chat/ChatInquiryModal').then((mod) => mod.ChatInquiryModal),
@@ -127,13 +173,15 @@ export default function ChatSessionPage(): React.ReactNode {
   }, [sessionId, apiFetch]);
 
   useEffect(() => {
-    fetchHistory();
+    queueMicrotask(() => {
+      void fetchHistory();
+    });
   }, [fetchHistory]);
 
   useEffect(() => {
     if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
       synth.current = globalThis.speechSynthesis;
-      setTtsSupported(true);
+      queueMicrotask(() => setTtsSupported(true));
     }
   }, []);
 
@@ -275,18 +323,20 @@ export default function ChatSessionPage(): React.ReactNode {
     setIsVisionModalOpen(false);
     setIsLoading(true);
     try {
-      for (const med of medsToAdd) {
-        await apiFetch('/medications', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: med.name,
-            dosage: med.dosage,
-            frequency: med.frequency,
-            startDate: new Date().toISOString(),
+      await Promise.all(
+        medsToAdd.map((med) =>
+          apiFetch('/medications', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: med.name,
+              dosage: med.dosage,
+              frequency: med.frequency,
+              startDate: new Date().toISOString(),
+            }),
           }),
-        });
-      }
-      handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
+        ),
+      );
+      await handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
     } catch (err) {
       logger.error({ err }, 'Vision confirm error');
       alert('약물 추가 중 오류가 발생했습니다.');
@@ -303,20 +353,14 @@ export default function ChatSessionPage(): React.ReactNode {
    */
   const renderContent = (msg: Message): React.ReactNode => {
     if (msg.role === 'ai') {
-      const html = DOMPurify.sanitize(marked.parse(msg.content) as string);
-      return (
-        <div
-          dangerouslySetInnerHTML={{ __html: html }}
-          className="prose prose-sm max-w-none dark:prose-invert"
-        />
-      );
+      return <SanitizedMarkdown content={msg.content} />;
     }
     return msg.content;
   };
 
   if (isInitializing) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="animate-spin text-primary" aria-hidden="true" />
       </div>
     );
