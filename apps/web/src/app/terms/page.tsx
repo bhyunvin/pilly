@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 /**
  * 서비스 이용약관 페이지 컴포넌트입니다.

@@ -1,12 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { logger } from '@/utils/logger';
-import { useApi } from '@/hooks/useApi';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -16,6 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 interface ChatInquiryModalProps {
   isOpen: boolean;
@@ -59,7 +59,9 @@ export function ChatInquiryModal({
       formData.append('content', inquiryContent);
       formData.append('chat_session_id', sessionId);
       formData.append('allow_chat_access', allowChatAccess ? 'true' : 'false');
-      inquiryAttachment.forEach((file) => formData.append('attachments', file));
+      for (const file of inquiryAttachment) {
+        formData.append('attachments', file);
+      }
 
       const res = await apiFetch('/inquiry', {
         method: 'POST',
@@ -83,7 +85,7 @@ export function ChatInquiryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[425px] bg-background">
+      <DialogContent className="w-[95vw] sm:max-w-106.25 bg-background">
         <DialogHeader>
           <DialogTitle>1:1 문의하기</DialogTitle>
           <DialogDescription>
@@ -105,7 +107,7 @@ export function ChatInquiryModal({
             <Label htmlFor="content">내용</Label>
             <Textarea
               id="content"
-              className="min-h-[100px] text-base md:text-sm"
+              className="min-h-25 text-base md:text-sm"
               value={inquiryContent}
               onChange={(e) => setInquiryContent(e.target.value)}
               required

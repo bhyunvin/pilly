@@ -211,7 +211,7 @@ async fn send_message(
         .collect();
 
     let url = format!(
-        "{}/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={}",
+        "{}/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse&key={}",
         state.config.gemini_base_url, state.config.gemini_api_key
     );
 

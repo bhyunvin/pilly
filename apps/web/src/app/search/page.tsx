@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
+import { Info, Loader2, Search } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { useApi } from '@/hooks/useApi';
+import { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Search, Loader2, Info } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { useApi } from '@/hooks/useApi';
 import type { Pill } from '@/types/pill';
+import { logger } from '@/utils/logger';
 
 const VisualFilters = dynamic(
   () => import('@/components/search/VisualFilters').then((mod) => mod.VisualFilters),

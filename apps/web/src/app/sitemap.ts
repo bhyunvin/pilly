@@ -1,4 +1,4 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 import { apiFetchJson } from '@/lib/api';
 import { logger } from '@/utils/logger';
 

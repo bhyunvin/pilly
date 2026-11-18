@@ -1,26 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
-import Link from 'next/link';
 import {
-  Home,
-  Search,
-  MessageCircle,
-  User,
-  Pill,
-  Edit2,
   Check,
-  X,
+  Edit2,
+  Home,
+  MessageCircle,
+  Pill,
+  Search,
   ShieldAlert,
+  User,
   UserMinus,
+  X,
 } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { authClient } from '@/lib/auth';
-import { useApi } from '@/hooks/useApi';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useApi } from '@/hooks/useApi';
+import { authClient } from '@/lib/auth';
+import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
 
 interface ChatSession {
   id: number;

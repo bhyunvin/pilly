@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Geist } from 'next/font/google';
-import { cn } from '@/lib/utils';
-import { ThemeProvider } from '@/components/theme-provider';
-import { AppShell } from '@/components/layout/AppShell';
-import { ErrorProvider } from '@/components/providers/ErrorProvider';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Geist } from 'next/font/google';
+import { AppShell } from '@/components/layout/AppShell';
+import { ErrorProvider } from '@/components/providers/ErrorProvider';
+import { ThemeProvider } from '@/components/theme-provider';
+import { cn } from '@/lib/utils';
 
 const geist = Geist({
   subsets: ['latin'],

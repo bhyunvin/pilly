@@ -1,11 +1,10 @@
 'use client';
 
-import * as React from 'react';
 import { Dialog as SheetPrimitive } from '@base-ui/react/dialog';
-
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { XIcon } from 'lucide-react';
+import type * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 /**
  * @description 측면에서 슬라이드하여 나타나는 오버레이 패널 컴포넌트의 루트입니다.
@@ -176,11 +175,11 @@ function SheetDescription({ className, ...props }: Readonly<SheetPrimitive.Descr
 
 export {
   Sheet,
-  SheetTrigger,
   SheetClose,
   SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
   SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
 };

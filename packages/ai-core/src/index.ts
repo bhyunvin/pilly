@@ -38,7 +38,7 @@ export class PillyAiCore {
   async getMedicineGuide(medicine: Medicine): Promise<string> {
     const { text } = await generateText({
       // [NOTE]: 고도의 추론(약물 상호작용, 금기사항 분석)이 필요한 경우 google('gemini-3.1-pro') 사용 권장
-      model: google('gemini-3.1-flash'),
+      model: google('gemini-3.8-flash'),
       system:
         '당신은 전문 약사 AI "필리(Pilly)"입니다. 사용자의 질문에 대해 안전하고 전문적인 복약 지도를 한국어로 친절하게 답변하세요.',
       prompt: `다음 약물에 대한 복용 주의사항과 보관 방법을 설명해 주세요:

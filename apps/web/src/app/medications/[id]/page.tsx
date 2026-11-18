@@ -1,5 +1,5 @@
-import { Metadata } from 'next';
-import { Pill as PillIcon, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pill as PillIcon } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 interface PageProps {
@@ -70,6 +70,7 @@ export default async function MedicationDetailPage({ params }: PageProps) {
       {/* 검색 엔진 및 AI 모델에게 구조화된 데이터를 제공하는 JSON-LD 스크립트 */}
       <script
         type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="flex items-center gap-4">

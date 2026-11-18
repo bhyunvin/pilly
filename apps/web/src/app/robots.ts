@@ -1,4 +1,4 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 
 /**
  * 서비스의 robots.txt 설정을 생성합니다.

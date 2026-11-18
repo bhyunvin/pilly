@@ -1,10 +1,7 @@
 'use client';
 
-import { useState, type SyntheticEvent } from 'react';
-import { logger } from '@/utils/logger';
 import { useRouter } from 'next/navigation';
-import { authClient } from '@/lib/auth';
-import { useApi } from '@/hooks/useApi';
+import { type SyntheticEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,6 +13,9 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useApi } from '@/hooks/useApi';
+import { authClient } from '@/lib/auth';
+import { logger } from '@/utils/logger';
 
 /**
  * 초기 프로필 설정 페이지 컴포넌트입니다.

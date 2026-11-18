@@ -1,9 +1,8 @@
 'use client';
 
 import { Checkbox as CheckboxPrimitive } from '@base-ui/react/checkbox';
-
-import { cn } from '@/lib/utils';
 import { CheckIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /**
  * @description 사용자가 여러 옵션 중 하나 이상을 선택할 수 있게 하는 체크박스 컴포넌트입니다.

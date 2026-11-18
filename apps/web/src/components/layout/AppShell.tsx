@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { logger } from '@/utils/logger';
-import { authClient } from '@/lib/auth';
+import type React from 'react';
+import { useEffect } from 'react';
 import { useApi } from '@/hooks/useApi';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
+import { authClient } from '@/lib/auth';
+import { logger } from '@/utils/logger';
 import { BottomNav } from './BottomNav';
 import { Footer } from './Footer';
+import { Header } from './Header';
+import { Sidebar } from './Sidebar';
 
 /**
  * @description 애플리케이션의 공통 레이아웃을 정의하는 셸 컴포넌트입니다.

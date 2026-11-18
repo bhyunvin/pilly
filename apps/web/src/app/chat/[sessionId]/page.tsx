@@ -1,29 +1,30 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { logger } from '@/utils/logger';
-import { useParams, useRouter } from 'next/navigation';
-import { useApi } from '@/hooks/useApi';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import type DOMPurify from 'dompurify';
 import {
-  Bot,
-  User,
-  Send,
-  Loader2,
   ArrowLeft,
-  HelpCircle,
+  Bot,
   Camera,
+  HelpCircle,
+  Loader2,
+  Send,
+  User,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { marked } from 'marked';
 import dynamic from 'next/dynamic';
+import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useApi } from '@/hooks/useApi';
+import { cn } from '@/lib/utils';
+import { logger } from '@/utils/logger';
 
-let domPurifyPromise: Promise<(typeof import('dompurify'))['default']> | undefined;
+let domPurifyPromise: Promise<typeof DOMPurify> | undefined;
 
 /**
  * 네이티브 Sanitizer API 미지원 브라우저를 위해 DOMPurify를 지연 로드합니다.

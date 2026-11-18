@@ -1,5 +1,5 @@
-import { authClient } from '@/lib/auth';
 import { useCallback } from 'react';
+import { authClient } from '@/lib/auth';
 
 interface UseApiReturn {
   /** 인증 토큰을 자동으로 주입하여 API 요청을 수행하는 비동기 함수 */
@@ -17,7 +17,7 @@ export const useApi = (): UseApiReturn => {
    * @description 백엔드 서버의 베이스 URL입니다.
    * 환경 변수 또는 로컬 호스트를 기준으로 /api/v1 프리픽스를 포함합니다.
    */
-  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/api/v1';
+  const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/v1`;
 
   /**
    * @description 인증 토큰을 자동으로 주입하여 API 요청을 수행하는 비동기 함수입니다.
@@ -38,7 +38,7 @@ export const useApi = (): UseApiReturn => {
       };
 
       if (sessionId) {
-        headers['Authorization'] = `Bearer ${sessionId}`;
+        headers.Authorization = `Bearer ${sessionId}`;
       }
 
       if (!(options.body instanceof FormData)) {

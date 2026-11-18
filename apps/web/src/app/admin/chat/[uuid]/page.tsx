@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { logger } from '@/utils/logger';
+import { AlertCircle, Bot, Clock, Loader2, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useApi } from '@/hooks/useApi';
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bot, User, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { useApi } from '@/hooks/useApi';
+import { logger } from '@/utils/logger';
 
 interface ChatLog {
   id: number;

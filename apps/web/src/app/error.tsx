@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { logger } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/utils/logger';
 
 export default function GlobalError({
   error,
