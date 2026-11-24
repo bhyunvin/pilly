@@ -16,28 +16,23 @@ import { marked } from 'marked';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AiChatLog, AnalyzedMedication } from 'types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useApi } from '@/hooks/useApi';
+import { useTTS } from '@/hooks/useTTS';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
 
 let domPurifyPromise: Promise<typeof DOMPurify> | undefined;
 
-/**
- * 네이티브 Sanitizer API 미지원 브라우저를 위해 DOMPurify를 지연 로드합니다.
- */
 function loadDOMPurify() {
   domPurifyPromise ??= import('dompurify').then((mod) => mod.default ?? mod);
   return domPurifyPromise;
 }
 
-/**
- * 마크다운을 HTML로 변환한 뒤 네이티브 Sanitizer API(`setHTML`)를 우선 사용하여 안전하게 렌더링합니다.
- * 미지원 브라우저에서는 DOMPurify를 동적으로 로드해 폴백합니다.
- */
 function SanitizedMarkdown({ content }: { readonly content: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +53,7 @@ function SanitizedMarkdown({ content }: { readonly content: string }) {
           }
         })
         .catch((err) => {
-          logger.error({ err }, 'Failed to load DOMPurify');
+          logger.error({ err }, 'DOMPurify 로드 실패');
         });
     }
 
@@ -90,29 +85,11 @@ interface Message {
   id: string;
   role: 'user' | 'ai';
   content: string;
-}
-
-interface ChatLog {
-  prompt: string;
-  response: string;
-}
-
-interface AnalyzedMed {
-  id?: string;
-  name: string;
-  dosage: string;
-  frequency: string;
-  checked?: boolean;
+  isGreeting?: boolean;
 }
 
 /**
  * 개별 채팅 세션 내에서 AI와 대화를 주고받는 페이지 컴포넌트입니다.
- *
- * @description
- * 사용자의 질문에 대해 Gemini AI 모델이 실시간 스트리밍 방식으로 답변을 생성합니다.
- * 이전 대화 내역을 불러오고, 새로운 메시지를 전송하며, 필요에 따라
- * 음성 합성(TTS) 기능을 통해 답변을 읽어줍니다. 또한 약물 사진 분석 기능을 통해
- * 처방전이나 약봉투 이미지를 분석하여 복약 정보를 자동으로 등록할 수 있습니다.
  *
  * @returns 채팅 세션 페이지 UI
  */
@@ -128,28 +105,21 @@ export default function ChatSessionPage(): React.ReactNode {
   const [isInitializing, setIsInitializing] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [ttsSupported, setTtsSupported] = useState(false);
+  const { speak, stopSpeaking, ttsSupported } = useTTS();
   const [ttsEnabled, setTtsEnabled] = useState(false);
-  const synth = useRef<SpeechSynthesis | null>(null);
 
   const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
-  const [analyzedMeds, setAnalyzedMeds] = useState<AnalyzedMed[]>([]);
+  const [analyzedMeds, setAnalyzedMeds] = useState<AnalyzedMedication[]>([]);
 
-  /**
-   * 해당 세션의 과거 대화 내역을 서버로부터 불러옵니다.
-   *
-   * @async
-   * @callback
-   */
   const fetchHistory = useCallback(async () => {
     try {
       const res = await apiFetch(`/chat/sessions/${sessionId}`);
       if (!res.ok) throw new Error('세션 로드 실패');
-      const result = (await res.json()) as { logs: ChatLog[] };
+      const result = (await res.json()) as { logs: AiChatLog[] };
 
       const history: Message[] = [];
       if (result.logs.length === 0) {
@@ -158,6 +128,7 @@ export default function ChatSessionPage(): React.ReactNode {
           role: 'ai',
           content:
             '안녕하세요! Pilly AI 복약 가이드입니다. 약물 복용법이나 주의사항에 대해 무엇이든 물어보세요.',
+          isGreeting: true,
         });
       } else {
         result.logs.forEach((log) => {
@@ -169,7 +140,7 @@ export default function ChatSessionPage(): React.ReactNode {
       }
       setMessages(history);
     } catch (err) {
-      logger.error({ err }, 'Chat history fetch error');
+      logger.error({ err }, '채팅 기록 조회 실패');
     } finally {
       setIsInitializing(false);
     }
@@ -182,109 +153,104 @@ export default function ChatSessionPage(): React.ReactNode {
   }, [fetchHistory]);
 
   useEffect(() => {
-    if (typeof globalThis !== 'undefined' && globalThis.speechSynthesis) {
-      synth.current = globalThis.speechSynthesis;
-      queueMicrotask(() => setTtsSupported(true));
-    }
-  }, []);
-
-  useEffect(() => {
     if (messages.length > 0 && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  /**
-   * 음성 안내(TTS) 기능의 사용 여부를 토글합니다.
-   */
   const toggleTts = () => {
-    if (ttsEnabled) synth.current?.cancel();
-    setTtsEnabled(!ttsEnabled);
+    if (ttsEnabled) {
+      stopSpeaking();
+    }
+    setTtsEnabled((prev) => !prev);
   };
 
   /**
-   * 주어진 텍스트를 한국어 음성으로 출력합니다.
-   *
-   * @param text - 음성으로 출력할 텍스트
+   * 사용자 질문 텍스트를 받아 AI 스트리밍 응답을 수신합니다.
+   * 초기 로컬 인사말(`isGreeting`)은 Gemini 멀티턴 규격 보호를 위해 API payload에서 제외합니다.
    */
-  const speak = (text: string) => {
-    if (!ttsEnabled || !synth.current) return;
-    synth.current.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.replaceAll(/[#*`]/g, ''));
-    utterance.lang = 'ko-KR';
-    synth.current.speak(utterance);
-  };
+  const sendPrompt = useCallback(
+    async (rawText: string) => {
+      const text = rawText.trim();
+      if (!text || isLoading) return;
 
-  /**
-   * 사용자 메시지를 서버로 전송하고 AI의 답변을 스트리밍 방식으로 수신합니다.
-   *
-   * @async
-   * @param e - 폼 제출 이벤트 객체
-   */
+      const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: text };
+      const conversationMessages = [...messages, userMessage];
+
+      setMessages([...conversationMessages, { id: crypto.randomUUID(), role: 'ai', content: '' }]);
+      setIsLoading(true);
+
+      try {
+        const historyPayload = conversationMessages
+          .filter((msg) => !msg.isGreeting && msg.content.trim().length > 0)
+          .slice(-10)
+          .map((msg) => ({
+            role: msg.role === 'ai' ? 'model' : 'user',
+            parts: [{ text: msg.content }],
+          }));
+
+        const response = await apiFetch(`/chat/sessions/${sessionId}/message`, {
+          method: 'POST',
+          body: JSON.stringify({ history: historyPayload }),
+        });
+
+        if (!response.ok) throw new Error('메시지 전송 실패');
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullResponse += chunk;
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated.at(-1);
+              if (last) last.content += chunk;
+              return updated;
+            });
+          }
+          const flushChunk = decoder.decode();
+          if (flushChunk) {
+            fullResponse += flushChunk;
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated.at(-1);
+              if (last) last.content += flushChunk;
+              return updated;
+            });
+          }
+          if (ttsEnabled && fullResponse.trim()) {
+            speak(fullResponse);
+          }
+        }
+        globalThis.dispatchEvent(new Event('refresh-sessions'));
+      } catch (err) {
+        logger.error({ err }, '채팅 메시지 전송 오류');
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated.at(-1);
+          if (last) last.content = '네트워크 연결 상태를 확인해 주세요.';
+          return updated;
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [apiFetch, isLoading, messages, sessionId, speak, ttsEnabled],
+  );
+
   const handleSend = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-
     const text = input;
-    const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: text };
-    const newMessages = [...messages, userMessage];
-
-    setMessages(newMessages);
     setInput('');
-    setIsLoading(true);
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'ai', content: '' }]);
-
-    try {
-      const historyPayload = newMessages.slice(-10).map((msg) => ({
-        role: msg.role === 'ai' ? 'model' : 'user',
-        parts: [{ text: msg.content }],
-      }));
-
-      const response = await apiFetch(`/chat/sessions/${sessionId}/message`, {
-        method: 'POST',
-        body: JSON.stringify({ history: historyPayload }),
-      });
-
-      if (!response.ok) throw new Error('메시지 전송 실패');
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          fullResponse += chunk;
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated.at(-1);
-            if (last) last.content += chunk;
-            return updated;
-          });
-        }
-        if (ttsEnabled) speak(fullResponse);
-      }
-    } catch (err) {
-      logger.error({ err }, 'Chat send error');
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated.at(-1);
-        if (last) last.content = '네트워크 연결 상태를 확인해 주세요.';
-        return updated;
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await sendPrompt(text);
   };
 
-  /**
-   * 업로드된 사진(처방전 등)을 AI Vision API를 통해 분석 요청합니다.
-   *
-   * @async
-   * @param e - 파일 입력 변경 이벤트 객체
-   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -303,7 +269,7 @@ export default function ChatSessionPage(): React.ReactNode {
       const result = await res.json();
       if (result.success) {
         setAnalyzedMeds(
-          (result.data as AnalyzedMed[]).map((m) => ({
+          (result.data as AnalyzedMedication[]).map((m) => ({
             ...m,
             id: crypto.randomUUID(),
             checked: true,
@@ -312,7 +278,7 @@ export default function ChatSessionPage(): React.ReactNode {
         setIsVisionModalOpen(true);
       }
     } catch (err) {
-      logger.error({ err }, 'Image analysis error');
+      logger.error({ err }, '처방전/약봉투 이미지 분석 오류');
       alert('이미지 분석에 실패했습니다.');
     } finally {
       setIsAnalyzingImage(false);
@@ -320,46 +286,51 @@ export default function ChatSessionPage(): React.ReactNode {
     }
   };
 
-  /**
-   * 분석된 약물 목록 중 사용자가 선택한 항목들을 실제 복약 목록에 추가합니다.
-   *
-   * @async
-   */
   const handleVisionConfirm = async () => {
-    const medsToAdd = analyzedMeds.filter((m) => m.checked);
-    if (medsToAdd.length === 0) return setIsVisionModalOpen(false);
+    const medsToAdd = analyzedMeds.filter((m) => m.checked && m.name.trim().length > 0);
+    if (medsToAdd.length === 0) {
+      setIsVisionModalOpen(false);
+      return;
+    }
 
     setIsVisionModalOpen(false);
     setIsLoading(true);
+    let addedSuccessfully = false;
     try {
-      await Promise.all(
+      const responses = await Promise.all(
         medsToAdd.map((med) =>
           apiFetch('/medications', {
             method: 'POST',
             body: JSON.stringify({
-              name: med.name,
-              dosage: med.dosage,
-              frequency: med.frequency,
+              name: med.name.trim(),
+              dosage: med.dosage.trim(),
+              frequency: med.frequency.trim(),
               startDate: new Date().toISOString(),
             }),
           }),
         ),
       );
-      await handleSend({ preventDefault: () => {} } as React.SyntheticEvent);
+      if (responses.some((res) => !res.ok)) {
+        throw new Error('약물 등록 요청 중 일부가 실패했습니다.');
+      }
+      addedSuccessfully = true;
     } catch (err) {
-      logger.error({ err }, 'Vision confirm error');
+      logger.error({ err }, '인식 약물 저장 오류');
       alert('약물 추가 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
+
+    if (addedSuccessfully) {
+      const summary = medsToAdd
+        .map((m) => (m.dosage ? `${m.name}(${m.dosage})` : m.name))
+        .join(', ');
+      await sendPrompt(
+        `방금 처방전 사진으로 [${summary}]을(를) 내 복약 목록에 추가했어요. 복용 시 주의할 점이나 상호작용을 안내해 주세요.`,
+      );
+    }
   };
 
-  /**
-   * 메시지 내용을 렌더링합니다. AI 답변인 경우 마크다운 형식을 파싱합니다.
-   *
-   * @param msg - 렌더링할 메시지 객체
-   * @returns 렌더링된 메시지 내용
-   */
   const renderContent = (msg: Message): React.ReactNode => {
     if (msg.role === 'ai') {
       return <SanitizedMarkdown content={msg.content} />;
@@ -380,6 +351,7 @@ export default function ChatSessionPage(): React.ReactNode {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             onClick={() => router.push('/chat')}
@@ -390,7 +362,10 @@ export default function ChatSessionPage(): React.ReactNode {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Bot className="text-primary" aria-hidden="true" /> AI 복약 상담
-              <Badge variant="outline" className="ml-2 text-green-600 border-green-600">
+              <Badge
+                variant="outline"
+                className="ml-2 text-green-700 border-green-700 dark:text-green-400 dark:border-green-400"
+              >
                 초개인화 모드 ON
               </Badge>
             </h1>
@@ -401,6 +376,7 @@ export default function ChatSessionPage(): React.ReactNode {
         <div className="flex items-center gap-2">
           {ttsSupported && (
             <Button
+              type="button"
               variant="outline"
               size="icon"
               onClick={toggleTts}
@@ -416,6 +392,7 @@ export default function ChatSessionPage(): React.ReactNode {
           )}
 
           <Button
+            type="button"
             variant="outline"
             size="icon"
             aria-label="1:1 문의하기"
@@ -458,7 +435,11 @@ export default function ChatSessionPage(): React.ReactNode {
                     : 'bg-muted-foreground/20 text-muted-foreground',
                 )}
               >
-                {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                {msg.role === 'user' ? (
+                  <User size={16} aria-hidden="true" />
+                ) : (
+                  <Bot size={16} aria-hidden="true" />
+                )}
               </div>
               <div
                 className={cn(
@@ -484,6 +465,7 @@ export default function ChatSessionPage(): React.ReactNode {
               className="hidden"
               ref={fileInputRef}
               onChange={handleImageUpload}
+              aria-label="약봉투 또는 처방전 이미지 선택"
             />
             <Button
               type="button"
@@ -494,9 +476,9 @@ export default function ChatSessionPage(): React.ReactNode {
               aria-label="사진으로 약 추가"
             >
               {isAnalyzingImage ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
               ) : (
-                <Camera size={18} />
+                <Camera size={18} aria-hidden="true" />
               )}
             </Button>
             <Input
@@ -513,7 +495,7 @@ export default function ChatSessionPage(): React.ReactNode {
               className="h-11 px-4"
               aria-label="메시지 전송"
             >
-              <Send size={18} />
+              <Send size={18} aria-hidden="true" />
             </Button>
           </form>
         </div>

@@ -36,7 +36,7 @@ Pilly is built as a polyglot monorepo combining a Rust backend and a Next.js fro
 - **Frontend (`apps/web`):** Next.js 16 (App Router), React 19, Tailwind CSS v4, Shadcn/UI (`@base-ui/react`), Zustand, Better Auth
 - **Backend (`apps/api`):** Rust (Edition 2024), Axum 0.8, Tokio, Tower HTTP, SQLx 0.8 (PostgreSQL 17), `mimalloc`, `moka`, `dashmap`
 - **Message Streaming:** Apache Iggy 0.6 (`iggy-server`)
-- **AI Integration:** Google Gemini API (`gemini-3.8-flash` SSE & Vision), `packages/ai-core`
+- **AI Integration:** Google Gemini API (`gemini-3.8-flash` SSE & Vision)
 - **Testing & Quality:** Vitest (`happy-dom` / `jsdom`), Playwright + `@axe-core/playwright`, Biome, Clippy
 
 ## 💎 Technical Excellence
@@ -72,7 +72,6 @@ pilly/
 │   │   └── Dockerfile       # Multi-stage build (pilly-api + iggy-server)
 │   └── web/                 # Next.js 16 App Router frontend
 ├── packages/
-│   ├── ai-core/             # Shared AI utilities & Gemini integration
 │   ├── types/               # Shared TypeScript definitions
 │   └── utils/               # Shared utility functions
 ├── docker-compose.yml       # PostgreSQL 17 (local-db profile) & Apache Iggy

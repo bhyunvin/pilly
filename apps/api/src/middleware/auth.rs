@@ -140,7 +140,7 @@ fn enforce_account_status_policy(
     method: &Method,
     original_path: &str,
     status: &str,
-    deleted_at: Option<chrono::NaiveDateTime>,
+    deleted_at: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Result<(), AppError> {
     let normalized_path = original_path.trim_end_matches('/');
     let is_profile_read = *method == Method::GET && normalized_path.ends_with("/profile");
@@ -196,8 +196,8 @@ impl FromRequestParts<AppState> for AuthUser {
         let user_id = claims.sub;
         let email = claims.email;
 
-        // 사용자 역할 및 계정 상태를 단일 쿼리로 조회 (기존 DB TIMESTAMP WITHOUT TIME ZONE 호환을 위해 NaiveDateTime 사용)
-        let row: Option<(String, String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
+        // 사용자 역할 및 계정 상태를 단일 쿼리로 조회
+        let row: Option<(String, String, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
             "SELECT role, status, deleted_at FROM user_profiles WHERE user_id = $1 LIMIT 1",
         )
         .bind(&user_id)

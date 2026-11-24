@@ -1,11 +1,11 @@
 use axum::{
     Json, Router,
-    extract::{Multipart, Path, State},
+    extract::{DefaultBodyLimit, Multipart, Path, State},
     http::StatusCode,
-    routing::{delete, get, post},
+    routing::{get, patch, post},
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -17,6 +17,9 @@ use crate::{
     state::AppState,
 };
 
+const MAX_IMAGE_SIZE_BYTES: usize = 10 * 1024 * 1024;
+const ALLOWED_IMAGE_MIMES: [&str; 4] = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateMedicationRequest {
@@ -24,6 +27,14 @@ pub struct CreateMedicationRequest {
     pub dosage: String,
     pub frequency: String,
     pub start_date: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateMedicationRequest {
+    pub name: String,
+    pub dosage: String,
+    pub frequency: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,19 +48,21 @@ struct MedicationHistoryItem {
     id: i32,
     medication_id: Option<i32>,
     status: Option<String>,
-    #[serde(with = "crate::db::opt_utc_naive_datetime")]
-    taken_at: Option<chrono::NaiveDateTime>,
+    taken_at: Option<DateTime<Utc>>,
 }
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(get_medications).post(create_medication))
-        .route("/{id}", delete(delete_medication))
+        .route("/{id}", patch(update_medication).delete(delete_medication))
         .route(
             "/{id}/history",
             get(get_medication_history).post(record_medication_history),
         )
-        .route("/analyze-image", post(analyze_image))
+        .route(
+            "/analyze-image",
+            post(analyze_image).layer(DefaultBodyLimit::max(MAX_IMAGE_SIZE_BYTES + 256 * 1024)),
+        )
 }
 
 /// 사용자의 복약 목록 조회
@@ -76,15 +89,22 @@ async fn create_medication(
     auth_user: AuthUser,
     Json(body): Json<CreateMedicationRequest>,
 ) -> AppResult<(StatusCode, Json<Value>)> {
+    let name = body.name.trim();
+    if name.is_empty() {
+        return Err(AppError::BadRequest(
+            "약물 이름을 입력해 주세요.".to_string(),
+        ));
+    }
+
     let start_date = body.start_date.unwrap_or_else(|| Utc::now().to_rfc3339());
 
     let med: UserMedication = sqlx::query_as(
         "INSERT INTO user_medications (user_id, name, dosage, frequency, start_date) VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, name, dosage, frequency, start_date, end_date, status, created_at",
     )
     .bind(&auth_user.user_id)
-    .bind(&body.name)
-    .bind(&body.dosage)
-    .bind(&body.frequency)
+    .bind(name)
+    .bind(body.dosage.trim())
+    .bind(body.frequency.trim())
     .bind(&start_date)
     .fetch_one(&state.pool)
     .await?;
@@ -98,17 +118,62 @@ async fn create_medication(
     ))
 }
 
-/// 복약 정보 삭제
+/// 복약 정보 수정 (본인 소유 확인)
+async fn update_medication(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(id): Path<i32>,
+    Json(body): Json<UpdateMedicationRequest>,
+) -> AppResult<Json<Value>> {
+    let name = body.name.trim();
+    if name.is_empty() {
+        return Err(AppError::BadRequest(
+            "약물 이름을 입력해 주세요.".to_string(),
+        ));
+    }
+
+    let updated: Option<UserMedication> = sqlx::query_as(
+        "UPDATE user_medications SET name = $1, dosage = $2, frequency = $3 \
+         WHERE id = $4 AND user_id = $5 \
+         RETURNING id, user_id, name, dosage, frequency, start_date, end_date, status, created_at",
+    )
+    .bind(name)
+    .bind(body.dosage.trim())
+    .bind(body.frequency.trim())
+    .bind(id)
+    .bind(&auth_user.user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let Some(med) = updated else {
+        return Err(AppError::NotFound(
+            "수정할 복약 정보를 찾을 수 없습니다.".to_string(),
+        ));
+    };
+
+    Ok(Json(json!({
+        "success": true,
+        "medication": med,
+    })))
+}
+
+/// 복약 정보 삭제 (미존재/타인 소유 시 404 반환)
 async fn delete_medication(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Value>> {
-    sqlx::query("DELETE FROM user_medications WHERE id = $1 AND user_id = $2")
+    let result = sqlx::query("DELETE FROM user_medications WHERE id = $1 AND user_id = $2")
         .bind(id)
         .bind(&auth_user.user_id)
         .execute(&state.pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(
+            "삭제할 복약 정보를 찾을 수 없습니다.".to_string(),
+        ));
+    }
 
     Ok(Json(json!({
         "success": true,
@@ -212,13 +277,38 @@ async fn analyze_image(
         .map_err(|e| AppError::BadRequest(format!("Multipart 파싱 실패: {e}")))?
     {
         if field.name() == Some("image") {
-            if let Some(ct) = field.content_type() {
-                mime_type = ct.to_string();
+            let ct = field
+                .content_type()
+                .map(|v| {
+                    v.split(';')
+                        .next()
+                        .unwrap_or("")
+                        .trim()
+                        .to_ascii_lowercase()
+                })
+                .unwrap_or_else(|| "image/jpeg".to_string());
+
+            if !ALLOWED_IMAGE_MIMES.contains(&ct.as_str()) {
+                return Err(AppError::BadRequest(
+                    "지원하지 않는 이미지 형식입니다. (JPEG, PNG, WEBP, HEIC만 허용)".to_string(),
+                ));
             }
+            mime_type = ct;
+
             let bytes = field
                 .bytes()
                 .await
                 .map_err(|e| AppError::BadRequest(format!("이미지 읽기 실패: {e}")))?;
+
+            if bytes.is_empty() {
+                return Err(AppError::BadRequest("빈 이미지 파일입니다.".to_string()));
+            }
+            if bytes.len() > MAX_IMAGE_SIZE_BYTES {
+                return Err(AppError::BadRequest(
+                    "이미지 파일 크기는 10MB 이하여야 합니다.".to_string(),
+                ));
+            }
+
             image_bytes = Some(bytes.to_vec());
             break;
         }
@@ -229,8 +319,8 @@ async fn analyze_image(
     let base64_image = BASE64.encode(&bytes);
 
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={}",
-        state.config.gemini_api_key
+        "{}/v1beta/models/{}:generateContent?key={}",
+        state.config.gemini_base_url, state.config.gemini_model, state.config.gemini_api_key
     );
 
     let payload = json!({
@@ -260,6 +350,13 @@ async fn analyze_image(
         .await
         .map_err(|e| AppError::External(format!("Gemini API 호출 실패: {e}")))?;
 
+    if !res.status().is_success() {
+        return Err(AppError::External(format!(
+            "Gemini Vision API 오류 응답: {}",
+            res.status()
+        )));
+    }
+
     let body: Value = res
         .json()
         .await
@@ -267,7 +364,9 @@ async fn analyze_image(
 
     let text = body["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
-        .unwrap_or("{\"medications\":[]}");
+        .ok_or_else(|| {
+            AppError::External("Gemini Vision 응답 본문이 비어 있습니다.".to_string())
+        })?;
 
     let parsed: Value = serde_json::from_str(text).unwrap_or_else(|_| json!({ "medications": [] }));
 

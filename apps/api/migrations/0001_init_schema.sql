@@ -1,6 +1,6 @@
 -- Pilly PostgreSQL 초기 스키마 마이그레이션
--- 기존 운영 DB(TIMESTAMP WITHOUT TIME ZONE)와의 호환성을 유지하면서
--- 신규 빈 DB에서도 안전하게 멱등(Idempotent) 초기화될 수 있도록 구성합니다.
+-- 모든 타임스탬프 컬럼은 UTC 기준 TIMESTAMPTZ로 저장·직렬화하며,
+-- 신규 DB에서도 안전하게 멱등(Idempotent) 초기화될 수 있도록 구성합니다.
 
 DO $$ BEGIN
     CREATE TYPE medication_status AS ENUM ('PENDING', 'COMPLETED', 'SKIPPED');
@@ -21,11 +21,11 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     role TEXT DEFAULT 'USER' NOT NULL,
     status TEXT DEFAULT 'ACTIVE' NOT NULL,
     restricted_reason TEXT,
-    restricted_at TIMESTAMP,
-    deleted_at TIMESTAMP,
+    restricted_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ,
     deletion_reason TEXT,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'),
-    updated_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS nickname_unique_idx ON user_profiles(nickname);
 CREATE INDEX IF NOT EXISTS user_profiles_deleted_at_idx ON user_profiles(deleted_at) WHERE deleted_at IS NOT NULL;
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_restriction_history (
     user_id VARCHAR(255) NOT NULL REFERENCES user_profiles(user_id) ON DELETE CASCADE,
     admin_id VARCHAR(255) NOT NULL,
     reason TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS user_restriction_history_user_id_idx ON user_restriction_history(user_id);
 
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS user_medications (
     start_date TEXT,
     end_date TEXT,
     status TEXT DEFAULT 'TAKING',
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS user_medications_user_id_idx ON user_medications(user_id);
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS medication_history (
     id SERIAL PRIMARY KEY,
     medication_id INTEGER REFERENCES user_medications(id) ON DELETE CASCADE,
     status medication_status DEFAULT 'PENDING',
-    taken_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    taken_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS medication_history_medication_id_idx ON medication_history(medication_id);
 
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     title TEXT,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'),
-    updated_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS chat_sessions_user_id_idx ON chat_sessions(user_id);
 
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS ai_chat_logs (
     user_id VARCHAR(255) NOT NULL,
     prompt TEXT NOT NULL,
     response TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS ai_chat_logs_session_id_idx ON ai_chat_logs(session_id);
 CREATE INDEX IF NOT EXISTS ai_chat_logs_user_id_idx ON ai_chat_logs(user_id);
@@ -90,10 +90,10 @@ CREATE TABLE IF NOT EXISTS chat_access_approvals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,
     chat_session_id INTEGER REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    granted_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC') NOT NULL,
-    accessed_at TIMESTAMP,
-    expires_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    granted_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    accessed_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS chat_access_approvals_chat_session_id_idx ON chat_access_approvals(chat_session_id);
 CREATE INDEX IF NOT EXISTS chat_access_approvals_user_id_idx ON chat_access_approvals(user_id);
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS user_inquiries (
     allow_chat_access BOOLEAN DEFAULT FALSE,
     chat_access_id UUID REFERENCES chat_access_approvals(id) ON DELETE CASCADE,
     status inquiry_status DEFAULT 'PENDING',
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS user_inquiries_user_id_idx ON user_inquiries(user_id);
 
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS inquiry_attachments (
     inquiry_id INTEGER REFERENCES user_inquiries(id) ON DELETE CASCADE,
     file_url TEXT NOT NULL,
     original_name TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS inquiry_attachments_inquiry_id_idx ON inquiry_attachments(inquiry_id);
 
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS user_activity_logs (
     user_id VARCHAR(255) NOT NULL,
     action TEXT NOT NULL,
     details TEXT,
-    created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS user_activity_logs_user_id_idx ON user_activity_logs(user_id);
 
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS pill_catalog (
     line_front VARCHAR(100),
     line_back VARCHAR(100),
     item_image TEXT,
-    updated_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS item_name_idx ON pill_catalog(item_name);
 CREATE INDEX IF NOT EXISTS drug_shape_idx ON pill_catalog(drug_shape);

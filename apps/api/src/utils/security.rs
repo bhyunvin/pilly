@@ -2,6 +2,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
 };
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use rand::RngCore;
 
 use crate::error::AppError;
@@ -32,8 +33,8 @@ pub fn validate_encryption_key(key_hex: &str) -> Result<[u8; ENCRYPTION_KEY_LEN]
     })
 }
 
-/// AES-256-GCM 알고리즘으로 텍스트를 암호화합니다. (Fail-Closed: 키 오류·암호화 실패 시 Err 반환)
-/// 기존 Node.js `IV:AuthTag:EncryptedText` (모두 hex 인코딩) 포맷과 100% 호환됩니다.
+/// AES-256-GCM 알고리즘으로 텍스트를 암호화하고 `Base64(nonce || ciphertext || auth_tag)` 문자열을 반환합니다.
+/// Fail-Closed 정책에 따라 키 오류·암호화 실패 시 Err를 반환합니다.
 pub fn encrypt(text: &str, key_hex: &str) -> Result<String, AppError> {
     let key_bytes = validate_encryption_key(key_hex)?;
     if text.is_empty() {
@@ -47,37 +48,30 @@ pub fn encrypt(text: &str, key_hex: &str) -> Result<String, AppError> {
     rand::thread_rng().fill_bytes(&mut iv);
     let nonce = Nonce::from(iv);
 
-    let mut ciphertext_with_tag = cipher
+    let ciphertext_with_tag = cipher
         .encrypt(&nonce, text.as_bytes())
         .map_err(|err| AppError::Internal(anyhow::anyhow!("AES-256-GCM 암호화 실패: {err}")))?;
 
-    // aes-gcm은 암호문 뒤에 16바이트 AuthTag를 붙여서 반환함
-    let tag_split_idx = ciphertext_with_tag.len().saturating_sub(GCM_AUTH_TAG_LEN);
-    let auth_tag = ciphertext_with_tag.split_off(tag_split_idx);
+    let mut payload = Vec::with_capacity(GCM_IV_LEN + ciphertext_with_tag.len());
+    payload.extend_from_slice(&iv);
+    payload.extend_from_slice(&ciphertext_with_tag);
 
-    Ok(format!(
-        "{}:{}:{}",
-        hex::encode(iv),
-        hex::encode(auth_tag),
-        hex::encode(ciphertext_with_tag)
-    ))
+    Ok(BASE64.encode(&payload))
 }
 
 fn try_decrypt(text: &str, key_hex: &str) -> Result<String, String> {
     let key_bytes = validate_encryption_key(key_hex)
         .map_err(|_| "ENCRYPTION_KEY가 유효하지 않습니다.".to_string())?;
 
-    let parts: Vec<&str> = text.split(':').collect();
-    if parts.len() != 3 {
-        return Err("암호문 포맷이 올바르지 않습니다.".to_string());
+    let raw = BASE64
+        .decode(text)
+        .map_err(|_| "암호문 Base64 디코딩에 실패했습니다.".to_string())?;
+
+    if raw.len() < GCM_IV_LEN + GCM_AUTH_TAG_LEN {
+        return Err("암호문 길이가 유효하지 않습니다.".to_string());
     }
 
-    let (iv, auth_tag, ciphertext) = (
-        hex::decode(parts[0]).map_err(|_| "IV hex 디코딩에 실패했습니다.".to_string())?,
-        hex::decode(parts[1]).map_err(|_| "AuthTag hex 디코딩에 실패했습니다.".to_string())?,
-        hex::decode(parts[2]).map_err(|_| "Ciphertext hex 디코딩에 실패했습니다.".to_string())?,
-    );
-
+    let (iv, ciphertext_with_tag) = raw.split_at(GCM_IV_LEN);
     let iv_arr: [u8; GCM_IV_LEN] = iv
         .try_into()
         .map_err(|_| format!("IV 길이가 {GCM_IV_LEN}바이트가 아닙니다."))?;
@@ -86,17 +80,14 @@ fn try_decrypt(text: &str, key_hex: &str) -> Result<String, String> {
         .map_err(|_| "AES-256-GCM 키 초기화 오류".to_string())?;
 
     let nonce = Nonce::from(iv_arr);
-    let mut payload = ciphertext;
-    payload.extend_from_slice(&auth_tag);
-
     let plaintext = cipher
-        .decrypt(&nonce, payload.as_ref())
+        .decrypt(&nonce, ciphertext_with_tag)
         .map_err(|err| format!("AES-256-GCM 복호화 오류: {err:?}"))?;
 
     String::from_utf8(plaintext).map_err(|err| format!("UTF-8 디코딩 오류: {err:?}"))
 }
 
-/// AES-256-GCM 암호화된 문자열(`IV:AuthTag:EncryptedText`)을 복호화합니다.
+/// `Base64(nonce || ciphertext || auth_tag)` 형식의 AES-256-GCM 암호문을 복호화합니다.
 /// 손상된 레코드 1건으로 목록 조회가 실패하지 않도록 실패 시 에러 로그만 기록하고 대체 안내 문구를 반환합니다.
 pub fn decrypt(text: &str, key_hex: &str) -> String {
     if text.is_empty() {
@@ -124,12 +115,10 @@ mod tests {
         let plain = "타이레놀정500mg 복용법 문의: 하루 3회 식후 30분!";
         let encrypted = encrypt(plain, TEST_KEY).expect("유효한 키로 암호화 성공");
         assert_ne!(encrypted, plain);
+        assert!(!encrypted.contains(':'));
 
-        // Node.js 호환 포맷: IV(24 hex):AuthTag(32 hex):Ciphertext(hex)
-        let parts: Vec<&str> = encrypted.split(':').collect();
-        assert_eq!(parts.len(), 3);
-        assert_eq!(parts[0].len(), 24);
-        assert_eq!(parts[1].len(), 32);
+        let raw = BASE64.decode(&encrypted).expect("Base64 디코딩 성공");
+        assert!(raw.len() >= GCM_IV_LEN + GCM_AUTH_TAG_LEN);
 
         let decrypted = decrypt(&encrypted, TEST_KEY);
         assert_eq!(decrypted, plain);
@@ -147,9 +136,10 @@ mod tests {
         assert_eq!(wrong_decrypted, DECRYPT_FAILURE_PLACEHOLDER);
 
         // 변조된 암호문 복호화 시 안전한 안내 문구 반환
-        let mut parts: Vec<String> = encrypted.split(':').map(String::from).collect();
-        parts[2] = "0000".to_string();
-        let tampered = parts.join(":");
+        let mut raw = BASE64.decode(&encrypted).expect("Base64 디코딩 성공");
+        let last_idx = raw.len() - 1;
+        raw[last_idx] ^= 0xff;
+        let tampered = BASE64.encode(&raw);
         assert_eq!(decrypt(&tampered, TEST_KEY), DECRYPT_FAILURE_PLACEHOLDER);
     }
 

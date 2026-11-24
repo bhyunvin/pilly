@@ -36,7 +36,7 @@ Pilly는 Rust 기반 고성능 백엔드와 Next.js 프론트엔드가 공존하
 - **Frontend (`apps/web`):** Next.js 16 (App Router), React 19, Tailwind CSS v4, Shadcn/UI (`@base-ui/react`), Zustand, Better Auth
 - **Backend (`apps/api`):** Rust (Edition 2024), Axum 0.8, Tokio, Tower HTTP, SQLx 0.8 (PostgreSQL 17), `mimalloc`, `moka`, `dashmap`
 - **Message Streaming:** Apache Iggy 0.6 (`iggy-server`)
-- **AI Integration:** Google Gemini API (`gemini-3.8-flash` SSE 스트리밍 & Vision), `packages/ai-core`
+- **AI Integration:** Google Gemini API (`gemini-3.8-flash` SSE 스트리밍 & Vision)
 - **Testing & Quality:** Vitest (`happy-dom` / `jsdom`), Playwright + `@axe-core/playwright`, Biome, Clippy
 
 ## 💎 기술적 우수성 (Technical Excellence)
@@ -72,7 +72,6 @@ pilly/
 │   │   └── Dockerfile       # 멀티 스테이지 빌드 (pilly-api + iggy-server)
 │   └── web/                 # Next.js 16 App Router 프론트엔드
 ├── packages/
-│   ├── ai-core/             # 공유 AI 유틸리티 및 Gemini 연동
 │   ├── types/               # 공유 TypeScript 타입 정의
 │   └── utils/               # 공유 유틸리티 함수
 ├── docker-compose.yml       # PostgreSQL 17 (local-db 프로필) 및 Apache Iggy

@@ -3,17 +3,10 @@
 import { AlertCircle, Bot, Clock, Loader2, User } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import type { AiChatLog } from 'types';
 import { Card, CardContent } from '@/components/ui/card';
 import { useApi } from '@/hooks/useApi';
 import { logger } from '@/utils/logger';
-
-interface ChatLog {
-  id: number;
-  userId: string;
-  prompt: string;
-  response: string;
-  createdAt: string;
-}
 
 /**
  * 관리자용 채팅 내역 열람 페이지 컴포넌트입니다.
@@ -25,16 +18,11 @@ export default function AdminChatViewPage(): React.ReactNode {
   const params = useParams();
   const uuid = params.uuid as string;
   const { apiFetch } = useApi();
-  const [logs, setLogs] = useState<ChatLog[]>([]);
+  const [logs, setLogs] = useState<AiChatLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    /**
-     * UUID를 사용하여 특정 사용자의 채팅 로그를 서버로부터 비동기로 가져옵니다.
-     *
-     * @async
-     */
     const fetchChatLogs = async () => {
       try {
         const response = await apiFetch(`/admin/chat/${uuid}`);
@@ -64,7 +52,7 @@ export default function AdminChatViewPage(): React.ReactNode {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <Loader2 size={40} className="animate-spin text-primary" />
+        <Loader2 size={40} className="animate-spin text-primary" aria-hidden="true" />
         <p className="text-muted-foreground">채팅 내역을 안전하게 불러오는 중입니다...</p>
       </div>
     );
@@ -75,13 +63,14 @@ export default function AdminChatViewPage(): React.ReactNode {
       <div className="max-w-md mx-auto py-20">
         <Card className="border-destructive/50 bg-destructive/5">
           <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
-            <AlertCircle size={48} className="text-destructive" />
+            <AlertCircle size={48} className="text-destructive" aria-hidden="true" />
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-destructive">열람 불가</h3>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
             <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock size={12} /> JIT Access 정책에 따라 24시간 후 자동 만료됩니다.
+              <Clock size={12} aria-hidden="true" /> JIT Access 정책에 따라 24시간 후 자동
+              만료됩니다.
             </div>
           </CardContent>
         </Card>
@@ -105,7 +94,7 @@ export default function AdminChatViewPage(): React.ReactNode {
           <div key={log.id} className="space-y-4">
             <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] ml-auto">
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-                <User size={16} />
+                <User size={16} aria-hidden="true" />
               </div>
               <div className="bg-primary text-primary-foreground px-4 py-2 rounded-2xl rounded-tr-none text-sm shadow-sm">
                 {log.prompt}
@@ -113,14 +102,14 @@ export default function AdminChatViewPage(): React.ReactNode {
             </div>
             <div className="flex items-start gap-3 max-w-[85%] mr-auto">
               <div className="w-8 h-8 rounded-full bg-muted-foreground/20 flex items-center justify-center text-muted-foreground shrink-0">
-                <Bot size={16} />
+                <Bot size={16} aria-hidden="true" />
               </div>
               <div className="bg-background border px-4 py-2 rounded-2xl rounded-tl-none text-sm shadow-sm">
                 {log.response}
               </div>
             </div>
             <div className="text-[10px] text-center text-muted-foreground">
-              {new Date(log.createdAt).toLocaleString()}
+              {log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'}
             </div>
             <hr className="border-dashed" />
           </div>

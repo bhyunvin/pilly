@@ -3,6 +3,7 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, History, User } from 'lucide-react';
+import type { UserProfile } from 'types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,24 +11,6 @@ import { Label } from '@/components/ui/label';
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-
-interface RestrictionHistory {
-  id: number;
-  adminId: string;
-  reason: string;
-  createdAt: string;
-}
-
-interface UserProfile {
-  userId: string;
-  nickname: string;
-  role: 'USER' | 'ADMIN';
-  status: 'ACTIVE' | 'RESTRICTED';
-  restrictedReason?: string;
-  restrictedAt?: string;
-  createdAt: string;
-  restrictionHistory?: RestrictionHistory[];
-}
 
 interface UserDetailSheetProps {
   selectedUser: UserProfile | null;
@@ -109,6 +92,7 @@ export function UserDetailSheet({
                   />
                 </div>
                 <Button
+                  type="button"
                   variant="destructive"
                   className="w-full"
                   onClick={() => restrictUser(selectedUser.userId)}
@@ -118,16 +102,18 @@ export function UserDetailSheet({
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-3 bg-white/50 rounded text-sm space-y-1">
+                <div className="p-3 bg-white/50 dark:bg-muted/50 rounded text-sm space-y-1">
                   <p className="font-semibold">제한 사유:</p>
                   <p>{selectedUser.restrictedReason || '사유 없음'}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     제한 일시:{' '}
-                    {selectedUser.restrictedAt &&
-                      format(new Date(selectedUser.restrictedAt), 'yyyy-MM-dd HH:mm:ss')}
+                    {selectedUser.restrictedAt
+                      ? format(new Date(selectedUser.restrictedAt), 'yyyy-MM-dd HH:mm:ss')
+                      : '-'}
                   </p>
                 </div>
                 <Button
+                  type="button"
                   variant="outline"
                   className="w-full"
                   onClick={() => activateUser(selectedUser.userId)}
@@ -150,7 +136,9 @@ export function UserDetailSheet({
                 <div key={h.id} className="relative space-y-1">
                   <div className="absolute -left-5.25 top-1.5 w-3 h-3 rounded-full bg-muted border-2 border-background" />
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(h.createdAt), 'yyyy. MM. dd. HH:mm', { locale: ko })}
+                    {h.createdAt
+                      ? format(new Date(h.createdAt), 'yyyy. MM. dd. HH:mm', { locale: ko })
+                      : '-'}
                   </p>
                   <p className="text-sm font-medium">{h.reason}</p>
                   <p className="text-xs text-muted-foreground">관리자 ID: {h.adminId}</p>

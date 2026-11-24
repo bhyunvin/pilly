@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@elysiajs/eden": "^1.4.9",
     "@radix-ui/react-label": "^2.1.17",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.1.0",

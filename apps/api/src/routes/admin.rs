@@ -1,15 +1,19 @@
+use std::collections::HashMap;
+
 use axum::{
     Json, Router,
     extract::{Path, State},
     http::HeaderMap,
     routing::{get, patch, post},
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sqlx::FromRow;
+use uuid::Uuid;
 
 use crate::{
-    db::{AiChatLog, ChatAccessApproval, UserProfile, UserRestrictionHistory},
+    db::{AiChatLog, ChatAccessApproval, InquiryAttachment, UserProfile, UserRestrictionHistory},
     error::{AppError, AppResult},
     middleware::auth::AdminUser,
     mq::PillyEvent,
@@ -23,15 +27,42 @@ pub struct UpdateStatusRequest {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize)]
+pub struct UpdateInquiryStatusRequest {
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 struct AdminUserSummary {
     user_id: String,
     nickname: String,
     role: String,
     status: String,
-    #[serde(with = "crate::db::opt_utc_naive_datetime")]
-    created_at: Option<chrono::NaiveDateTime>,
+    created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+struct AdminInquiryRow {
+    id: i32,
+    user_id: String,
+    nickname: Option<String>,
+    chat_session_id: Option<i32>,
+    title: String,
+    content: String,
+    allow_chat_access: Option<bool>,
+    chat_access_id: Option<Uuid>,
+    status: Option<String>,
+    created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AdminInquiryItem {
+    #[serde(flatten)]
+    inquiry: AdminInquiryRow,
+    attachments: Vec<InquiryAttachment>,
 }
 
 pub fn router() -> Router<AppState> {
@@ -39,6 +70,8 @@ pub fn router() -> Router<AppState> {
         .route("/sync-pills", post(sync_pills))
         .route("/users", get(list_users))
         .route("/withdrawals", get(list_withdrawals))
+        .route("/inquiries", get(list_admin_inquiries))
+        .route("/inquiries/{id}/status", patch(update_inquiry_status))
         .route("/users/{userId}", get(get_user_detail))
         .route("/users/{userId}/role", patch(toggle_user_role))
         .route("/users/{userId}/status", patch(update_user_status))
@@ -52,6 +85,19 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
             .zip(b.iter())
             .fold(0u8, |diff, (x, y)| diff | (x ^ y))
             == 0
+}
+
+fn spawn_admin_audit(state: &AppState, admin_id: String, action: String, target_id: String) {
+    let producer = state.producer.clone();
+    tokio::spawn(async move {
+        producer
+            .publish(PillyEvent::AdminAudit {
+                admin_id,
+                action,
+                target_id,
+            })
+            .await;
+    });
 }
 
 /// 의약품 데이터 동기화 트리거 (x-admin-key 헤더 상수 시간 검증)
@@ -82,24 +128,11 @@ async fn sync_pills(State(state): State<AppState>, headers: HeaderMap) -> AppRes
 
 /// 전체 사용자 목록 조회
 async fn list_users(State(state): State<AppState>, _admin: AdminUser) -> AppResult<Json<Value>> {
-    let rows: Vec<(String, String, String, String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
+    let users: Vec<AdminUserSummary> = sqlx::query_as(
         "SELECT user_id, nickname, role, status, created_at FROM user_profiles ORDER BY created_at DESC",
     )
     .fetch_all(&state.pool)
     .await?;
-
-    let users: Vec<AdminUserSummary> = rows
-        .into_iter()
-        .map(
-            |(user_id, nickname, role, status, created_at)| AdminUserSummary {
-                user_id,
-                nickname,
-                role,
-                status,
-                created_at,
-            },
-        )
-        .collect();
 
     Ok(Json(json!({
         "success": true,
@@ -121,6 +154,98 @@ async fn list_withdrawals(
     Ok(Json(json!({
         "success": true,
         "data": withdrawals,
+    })))
+}
+
+/// 관리자 1:1 문의 전체 목록 조회 (첨부파일 및 JIT 승인 UUID 포함)
+async fn list_admin_inquiries(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+) -> AppResult<Json<Value>> {
+    let rows: Vec<AdminInquiryRow> = sqlx::query_as(
+        "SELECT ui.id, ui.user_id, up.nickname, ui.chat_session_id, ui.title, ui.content, \
+         ui.allow_chat_access, ui.chat_access_id, ui.status::text, ui.created_at \
+         FROM user_inquiries ui \
+         LEFT JOIN user_profiles up ON ui.user_id = up.user_id \
+         ORDER BY ui.created_at DESC",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    if rows.is_empty() {
+        return Ok(Json(json!({
+            "success": true,
+            "data": [],
+        })));
+    }
+
+    let inquiry_ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+    let attachments: Vec<InquiryAttachment> = sqlx::query_as(
+        "SELECT id, inquiry_id, file_url, original_name, created_at FROM inquiry_attachments WHERE inquiry_id = ANY($1) ORDER BY id ASC",
+    )
+    .bind(&inquiry_ids)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut attachment_map: HashMap<i32, Vec<InquiryAttachment>> = HashMap::new();
+    for att in attachments {
+        if let Some(inq_id) = att.inquiry_id {
+            attachment_map.entry(inq_id).or_default().push(att);
+        }
+    }
+
+    let items: Vec<AdminInquiryItem> = rows
+        .into_iter()
+        .map(|inquiry| {
+            let atts = attachment_map.remove(&inquiry.id).unwrap_or_default();
+            AdminInquiryItem {
+                inquiry,
+                attachments: atts,
+            }
+        })
+        .collect();
+
+    Ok(Json(json!({
+        "success": true,
+        "data": items,
+    })))
+}
+
+/// 관리자 1:1 문의 상태 변경 (`PENDING` / `RESOLVED`)
+async fn update_inquiry_status(
+    State(state): State<AppState>,
+    admin: AdminUser,
+    Path(inquiry_id): Path<i32>,
+    Json(body): Json<UpdateInquiryStatusRequest>,
+) -> AppResult<Json<Value>> {
+    if !matches!(body.status.as_str(), "PENDING" | "RESOLVED") {
+        return Err(AppError::BadRequest(
+            "문의 상태는 PENDING 또는 RESOLVED여야 합니다.".to_string(),
+        ));
+    }
+
+    let result = sqlx::query("UPDATE user_inquiries SET status = $1::inquiry_status WHERE id = $2")
+        .bind(&body.status)
+        .bind(inquiry_id)
+        .execute(&state.pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(
+            "해당 문의 내역을 찾을 수 없습니다.".to_string(),
+        ));
+    }
+
+    spawn_admin_audit(
+        &state,
+        admin.user_id,
+        format!("INQUIRY_STATUS_{}", body.status),
+        format!("inquiry:{inquiry_id}"),
+    );
+
+    Ok(Json(json!({
+        "success": true,
+        "status": body.status,
     })))
 }
 
@@ -162,12 +287,18 @@ async fn get_user_detail(
     })))
 }
 
-/// 사용자 권한 변경 (USER <-> ADMIN 토글)
+/// 사용자 권한 변경 (USER <-> ADMIN 토글, 본인 계정 변경 차단)
 async fn toggle_user_role(
     State(state): State<AppState>,
     admin: AdminUser,
     Path(user_id): Path<String>,
 ) -> AppResult<Json<Value>> {
+    if admin.user_id == user_id {
+        return Err(AppError::BadRequest(
+            "본인 계정의 권한이나 이용 상태는 변경할 수 없습니다.".to_string(),
+        ));
+    }
+
     let current_role: Option<(String,)> =
         sqlx::query_as("SELECT role FROM user_profiles WHERE user_id = $1 LIMIT 1")
             .bind(&user_id)
@@ -179,23 +310,18 @@ async fn toggle_user_role(
     };
 
     let new_role = if role == "ADMIN" { "USER" } else { "ADMIN" };
-    sqlx::query("UPDATE user_profiles SET role = $1 WHERE user_id = $2")
+    sqlx::query("UPDATE user_profiles SET role = $1, updated_at = NOW() WHERE user_id = $2")
         .bind(new_role)
         .bind(&user_id)
         .execute(&state.pool)
         .await?;
 
-    // 관리자 감사 로그 비동기 발행
-    let producer = state.producer.clone();
-    tokio::spawn(async move {
-        producer
-            .publish(PillyEvent::AdminAudit {
-                admin_id: admin.user_id,
-                action: format!("TOGGLE_ROLE_{new_role}"),
-                target_id: user_id,
-            })
-            .await;
-    });
+    spawn_admin_audit(
+        &state,
+        admin.user_id,
+        format!("TOGGLE_ROLE_{new_role}"),
+        user_id,
+    );
 
     Ok(Json(json!({
         "success": true,
@@ -203,13 +329,19 @@ async fn toggle_user_role(
     })))
 }
 
-/// 사용자 계정 상태 변경 (ACTIVE / RESTRICTED)
+/// 사용자 계정 상태 변경 (ACTIVE / RESTRICTED, 본인 계정 변경 차단)
 async fn update_user_status(
     State(state): State<AppState>,
     admin: AdminUser,
     Path(user_id): Path<String>,
     Json(body): Json<UpdateStatusRequest>,
 ) -> AppResult<Json<Value>> {
+    if admin.user_id == user_id {
+        return Err(AppError::BadRequest(
+            "본인 계정의 권한이나 이용 상태는 변경할 수 없습니다.".to_string(),
+        ));
+    }
+
     let exists: Option<(String,)> =
         sqlx::query_as("SELECT user_id FROM user_profiles WHERE user_id = $1 LIMIT 1")
             .bind(&user_id)
@@ -224,6 +356,8 @@ async fn update_user_status(
         "RESTRICTED" => {
             let reason = body
                 .reason
+                .map(|r| r.trim().to_string())
+                .filter(|r| !r.is_empty())
                 .unwrap_or_else(|| "관리자에 의해 계정이 제한되었습니다.".to_string());
             let mut tx = state.pool.begin().await?;
 
@@ -261,21 +395,26 @@ async fn update_user_status(
         }
     }
 
+    spawn_admin_audit(
+        &state,
+        admin.user_id,
+        format!("USER_STATUS_{}", body.status),
+        user_id,
+    );
+
     Ok(Json(json!({
         "success": true,
         "message": format!("사용자 상태가 {}로 변경되었습니다.", body.status),
     })))
 }
 
-/// JIT(Just-In-Time) 채팅 로그 접근 제어 (세션 ID 또는 승인 UUID 지원, 24시간 유효)
+/// JIT(Just-In-Time) 채팅 로그 접근 제어 (원자적 최초 열람 처리, 24시간 유효, 감사 로그 발행)
 async fn get_jit_chat_logs(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(target): Path<String>,
 ) -> AppResult<Json<Value>> {
-    let approval: Option<ChatAccessApproval> = if let Ok(approval_uuid) =
-        uuid::Uuid::parse_str(&target)
-    {
+    let approval: Option<ChatAccessApproval> = if let Ok(approval_uuid) = Uuid::parse_str(&target) {
         sqlx::query_as(
             "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE id = $1 LIMIT 1",
         )
@@ -305,27 +444,20 @@ async fn get_jit_chat_logs(
         .chat_session_id
         .ok_or_else(|| AppError::NotFound("연결된 채팅 세션을 찾을 수 없습니다.".to_string()))?;
 
-    let now = Utc::now().naive_utc();
-    if approval.accessed_at.is_some() {
-        if let Some(expires_at) = approval.expires_at
-            && now > expires_at
-        {
-            return Err(AppError::Forbidden(
-                "접근 권한이 만료되었습니다.".to_string(),
-            ));
-        }
-    } else {
-        let expires_at = now + Duration::hours(24);
-        sqlx::query(
-            "UPDATE chat_access_approvals SET accessed_at = $1, expires_at = $2 WHERE id = $3",
-        )
-        .bind(now)
-        .bind(expires_at)
-        .bind(approval.id)
-        .execute(&state.pool)
-        .await?;
+    let now = Utc::now();
+    let expires_at = now + Duration::hours(24);
 
-        // 최초 열람 시 사용자에게 개인정보 열람 고지 이메일 비동기 발송
+    // 최초 열람인 경우 원자적으로 `accessed_at IS NULL` 조건부 업데이트를 시도해 중복 이메일 발송 차단
+    let first_claimed: Option<(Option<DateTime<Utc>>,)> = sqlx::query_as(
+        "UPDATE chat_access_approvals SET accessed_at = $1, expires_at = $2 WHERE id = $3 AND accessed_at IS NULL RETURNING expires_at",
+    )
+    .bind(now)
+    .bind(expires_at)
+    .bind(approval.id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if first_claimed.is_some() {
         let pool_clone = state.pool.clone();
         let config_clone = state.config.clone();
         let target_user_id = approval.user_id.clone();
@@ -352,6 +484,12 @@ async fn get_jit_chat_logs(
                 );
             }
         });
+    } else if let Some(existing_expires_at) = approval.expires_at
+        && now > existing_expires_at
+    {
+        return Err(AppError::Forbidden(
+            "접근 권한이 만료되었습니다.".to_string(),
+        ));
     }
 
     let raw_logs: Vec<AiChatLog> = sqlx::query_as(
@@ -369,6 +507,13 @@ async fn get_jit_chat_logs(
             log
         })
         .collect();
+
+    spawn_admin_audit(
+        &state,
+        admin.user_id,
+        "JIT_CHAT_VIEW".to_string(),
+        format!("session:{session_id}"),
+    );
 
     Ok(Json(json!({
         "success": true,

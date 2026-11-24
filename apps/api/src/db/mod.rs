@@ -1,85 +1,9 @@
 use std::env;
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, postgres::PgPoolOptions};
 use uuid::Uuid;
-
-/// 기존 PostgreSQL `TIMESTAMP WITHOUT TIME ZONE` 컬럼(`NaiveDateTime`)을
-/// JSON 직렬화 시 UTC RFC3339(`Z` 접미사) 형식으로 변환하는 Serde 모듈입니다.
-pub mod utc_naive_datetime {
-    use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
-    use serde::{Deserialize, Deserializer, Serializer, de};
-
-    const LEGACY_NAIVE_FORMATS: [&str; 4] = [
-        "%Y-%m-%dT%H:%M:%S%.f",
-        "%Y-%m-%d %H:%M:%S%.f",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d %H:%M:%S",
-    ];
-
-    /// `NaiveDateTime` 값을 UTC 기준 RFC3339 문자열(`Z` 포함)로 직렬화합니다.
-    pub fn serialize<S>(dt: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let utc_dt = DateTime::<Utc>::from_naive_utc_and_offset(*dt, Utc);
-        serializer.serialize_str(&utc_dt.to_rfc3339_opts(SecondsFormat::AutoSi, true))
-    }
-
-    /// RFC3339 문자열 또는 기존 `NaiveDateTime` 문자열을 `NaiveDateTime`(UTC 기준)으로 역직렬화합니다.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        deserialize_str(&s)
-    }
-
-    pub(super) fn deserialize_str<E: de::Error>(s: &str) -> Result<NaiveDateTime, E> {
-        parse_utc_or_naive(s)
-            .ok_or_else(|| E::custom(format!("유효하지 않은 UTC/Naive 날짜 형식입니다: {s}")))
-    }
-
-    fn parse_utc_or_naive(s: &str) -> Option<NaiveDateTime> {
-        if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-            return Some(dt.naive_utc());
-        }
-        LEGACY_NAIVE_FORMATS
-            .iter()
-            .find_map(|fmt| NaiveDateTime::parse_from_str(s, fmt).ok())
-    }
-}
-
-/// 선택적(`Option<NaiveDateTime>`) 날짜 필드를 UTC RFC3339(`Z` 접미사) 형식으로 변환하는 Serde 모듈입니다.
-pub mod opt_utc_naive_datetime {
-    use chrono::NaiveDateTime;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    use super::utc_naive_datetime;
-
-    /// `Option<NaiveDateTime>` 값을 UTC 기준 RFC3339 문자열 또는 `null`로 직렬화합니다.
-    pub fn serialize<S>(dt: &Option<NaiveDateTime>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match dt {
-            Some(value) => utc_naive_datetime::serialize(value, serializer),
-            None => serializer.serialize_none(),
-        }
-    }
-
-    /// 선택적 날짜 문자열 또는 `null`을 `Option<NaiveDateTime>`으로 역직렬화합니다.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<NaiveDateTime>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Option::<String>::deserialize(deserializer)?
-            .as_deref()
-            .map(utc_naive_datetime::deserialize_str)
-            .transpose()
-    }
-}
 
 const FALSY_ENV_VALUES: [&str; 3] = ["false", "0", "no"];
 
@@ -128,8 +52,7 @@ pub struct UserMedication {
     pub start_date: Option<String>,
     pub end_date: Option<String>,
     pub status: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -138,10 +61,8 @@ pub struct ChatSession {
     pub id: i32,
     pub user_id: String,
     pub title: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub updated_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -152,8 +73,7 @@ pub struct AiChatLog {
     pub user_id: String,
     pub prompt: String,
     pub response: String,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -163,8 +83,7 @@ pub struct UserActivityLog {
     pub user_id: String,
     pub action: String,
     pub details: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -181,8 +100,7 @@ pub struct PillCatalog {
     pub line_front: Option<String>,
     pub line_back: Option<String>,
     pub item_image: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub updated_at: Option<NaiveDateTime>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -193,15 +111,11 @@ pub struct UserProfile {
     pub role: String,
     pub status: String,
     pub restricted_reason: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub restricted_at: Option<NaiveDateTime>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub deleted_at: Option<NaiveDateTime>,
+    pub restricted_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
     pub deletion_reason: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub updated_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -211,8 +125,7 @@ pub struct UserRestrictionHistory {
     pub user_id: String,
     pub admin_id: String,
     pub reason: String,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -221,14 +134,10 @@ pub struct ChatAccessApproval {
     pub id: Uuid,
     pub user_id: String,
     pub chat_session_id: Option<i32>,
-    #[serde(with = "utc_naive_datetime")]
-    pub granted_at: NaiveDateTime,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub accessed_at: Option<NaiveDateTime>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub expires_at: Option<NaiveDateTime>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub granted_at: DateTime<Utc>,
+    pub accessed_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -242,8 +151,17 @@ pub struct UserInquiry {
     pub allow_chat_access: Option<bool>,
     pub chat_access_id: Option<Uuid>,
     pub status: Option<String>,
-    #[serde(with = "opt_utc_naive_datetime")]
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct InquiryAttachment {
+    pub id: i32,
+    pub inquiry_id: Option<i32>,
+    pub file_url: String,
+    pub original_name: String,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]
@@ -253,20 +171,18 @@ mod tests {
 
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     struct SampleDates {
-        #[serde(with = "utc_naive_datetime")]
-        required: NaiveDateTime,
-        #[serde(with = "opt_utc_naive_datetime")]
-        optional: Option<NaiveDateTime>,
-        #[serde(with = "opt_utc_naive_datetime")]
-        missing: Option<NaiveDateTime>,
+        required: DateTime<Utc>,
+        optional: Option<DateTime<Utc>>,
+        missing: Option<DateTime<Utc>>,
     }
 
     #[test]
-    fn test_utc_naive_datetime_serializes_with_z_suffix() {
+    fn test_utc_datetime_serializes_with_z_suffix() {
         let dt = NaiveDate::from_ymd_opt(2026, 11, 24)
             .unwrap()
             .and_hms_milli_opt(8, 15, 30, 123)
-            .unwrap();
+            .unwrap()
+            .and_utc();
 
         let sample = SampleDates {
             required: dt,
@@ -281,24 +197,6 @@ mod tests {
 
         let roundtrip: SampleDates = serde_json::from_value(json_val).expect("역직렬화 성공");
         assert_eq!(roundtrip, sample);
-    }
-
-    #[test]
-    fn test_utc_naive_datetime_deserializes_legacy_naive_format() {
-        let legacy_json = serde_json::json!({
-            "required": "2026-11-24T08:15:30",
-            "optional": "2026-11-24 08:15:30",
-            "missing": null
-        });
-
-        let parsed: SampleDates = serde_json::from_value(legacy_json).expect("레거시 포맷 호환");
-        let expected = NaiveDate::from_ymd_opt(2026, 11, 24)
-            .unwrap()
-            .and_hms_opt(8, 15, 30)
-            .unwrap();
-        assert_eq!(parsed.required, expected);
-        assert_eq!(parsed.optional, Some(expected));
-        assert_eq!(parsed.missing, None);
     }
 
     #[test]

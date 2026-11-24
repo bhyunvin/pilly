@@ -1,12 +1,13 @@
 'use client';
 
 import { format } from 'date-fns';
-import { ShieldAlert } from 'lucide-react';
+import { AlertCircle, ShieldAlert } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
+import type { UserProfile } from 'types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
 import {
   Table,
@@ -27,24 +28,6 @@ const UserDetailSheet = dynamic(
   },
 );
 
-interface RestrictionHistory {
-  id: number;
-  adminId: string;
-  reason: string;
-  createdAt: string;
-}
-
-interface UserProfile {
-  userId: string;
-  nickname: string;
-  role: 'USER' | 'ADMIN';
-  status: 'ACTIVE' | 'RESTRICTED';
-  restrictedReason?: string;
-  restrictedAt?: string;
-  createdAt: string;
-  restrictionHistory?: RestrictionHistory[];
-}
-
 /**
  * 관리자용 사용자 관리 페이지 컴포넌트입니다.
  * 전체 사용자 목록 조회, 상세 정보 확인, 권한 변경 및 이용 제한 등의 관리 기능을 수행합니다.
@@ -57,39 +40,37 @@ export default function AdminUsersPage(): React.ReactNode {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [restrictionReason, setRestrictionReason] = useState('');
 
-  /**
-   * 서버로부터 전체 사용자 목록을 비동기로 가져옵니다.
-   *
-   * @async
-   */
   const fetchUsers = useCallback(async () => {
     try {
+      setError('');
       const httpResponse = await apiFetch('/admin/users');
+      if (httpResponse.status === 403) {
+        setError('관리자 권한이 필요합니다.');
+        return;
+      }
+      if (!httpResponse.ok) {
+        throw new Error('사용자 목록 조회 실패');
+      }
       const userListResponse = await httpResponse.json();
       if (userListResponse.success) {
         setUsers(userListResponse.users);
       }
     } catch (err) {
       logger.error({ err }, 'Admin fetch users error');
-      alert('사용자 목록을 불러오는 중 오류가 발생했습니다.');
+      setError('사용자 목록을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
   }, [apiFetch]);
 
-  /**
-   * 특정 사용자의 상세 정보와 제재 이력을 비동기로 가져옵니다.
-   *
-   * @async
-   * @param userId - 상세 정보를 조회할 사용자의 고유 ID
-   */
   const fetchUserDetails = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}`);
       const userDetailResponse = await httpResponse.json();
-      if (userDetailResponse.success) {
+      if (httpResponse.ok && userDetailResponse.success) {
         setSelectedUser(userDetailResponse.user);
         setIsDetailOpen(true);
       }
@@ -98,18 +79,16 @@ export default function AdminUsersPage(): React.ReactNode {
     }
   };
 
-  /**
-   * 사용자의 권한(USER/ADMIN)을 비동기로 전환합니다.
-   *
-   * @async
-   * @param userId - 권한을 변경할 사용자의 고유 ID
-   */
   const toggleRole = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/role`, {
         method: 'PATCH',
       });
       const roleToggleResponse = await httpResponse.json();
+      if (!httpResponse.ok) {
+        alert(roleToggleResponse.message || '권한 변경에 실패했습니다.');
+        return;
+      }
       if (roleToggleResponse.success) {
         setUsers((prev) =>
           prev.map((u) => (u.userId === userId ? { ...u, role: roleToggleResponse.role } : u)),
@@ -124,12 +103,6 @@ export default function AdminUsersPage(): React.ReactNode {
     }
   };
 
-  /**
-   * 특정 사용자의 서비스 이용을 비동기로 제한(정지)합니다.
-   *
-   * @async
-   * @param userId - 이용을 제한할 사용자의 고유 ID
-   */
   const restrictUser = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {
@@ -140,6 +113,10 @@ export default function AdminUsersPage(): React.ReactNode {
         }),
       });
       const statusUpdateResponse = await httpResponse.json();
+      if (!httpResponse.ok) {
+        alert(statusUpdateResponse.message || '이용 제한 처리에 실패했습니다.');
+        return;
+      }
       if (statusUpdateResponse.success) {
         await Promise.all([fetchUsers(), fetchUserDetails(userId)]);
         setRestrictionReason('');
@@ -149,12 +126,6 @@ export default function AdminUsersPage(): React.ReactNode {
     }
   };
 
-  /**
-   * 이용이 제한된 사용자의 계정을 비동기로 다시 활성화합니다.
-   *
-   * @async
-   * @param userId - 활성화할 사용자의 고유 ID
-   */
   const activateUser = async (userId: string) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {
@@ -164,6 +135,10 @@ export default function AdminUsersPage(): React.ReactNode {
         }),
       });
       const statusUpdateResponse = await httpResponse.json();
+      if (!httpResponse.ok) {
+        alert(statusUpdateResponse.message || '이용 제한 해제에 실패했습니다.');
+        return;
+      }
       if (statusUpdateResponse.success) {
         await Promise.all([fetchUsers(), fetchUserDetails(userId)]);
         setRestrictionReason('');
@@ -182,6 +157,19 @@ export default function AdminUsersPage(): React.ReactNode {
   if (isLoading) {
     return (
       <div className="p-8 text-center text-muted-foreground">사용자 목록을 불러오는 중...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto py-20">
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="pt-6 flex flex-col items-center text-center gap-3">
+            <AlertCircle size={40} className="text-destructive" aria-hidden="true" />
+            <p className="font-semibold text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -227,10 +215,10 @@ export default function AdminUsersPage(): React.ReactNode {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {format(new Date(user.createdAt), 'yyyy-MM-dd')}
+                  {user.createdAt ? format(new Date(user.createdAt), 'yyyy-MM-dd') : '-'}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">
+                  <Button type="button" variant="ghost" size="sm">
                     상세보기
                   </Button>
                 </TableCell>

@@ -88,15 +88,3 @@ export const stripForTts = (text: string): string => {
     .replaceAll(/\s+/g, ' ') // 다중 공백 정리
     .trim();
 };
-
-/**
- * 공용 날짜 포맷터 (yyyy-MM-dd)
- * @description Date 객체 또는 날짜 문자열을 받아 표준 ISO 날짜 형식의 앞부분(날짜)만 반환합니다.
- *
- * @param date - 변환할 날짜 객체 또는 문자열
- * @returns 'yyyy-MM-dd' 형식의 문자열
- */
-export const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
-};

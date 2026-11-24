@@ -7,9 +7,11 @@ import {
   Home,
   LogOut,
   MessageCircle,
+  MessageSquare,
   Pill,
   Search,
   ShieldAlert,
+  Trash2,
   User,
   UserMinus,
   X,
@@ -17,6 +19,7 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import type { ChatSession } from 'types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { clearAuthTokenCache, useApi } from '@/hooks/useApi';
@@ -24,19 +27,13 @@ import { authClient } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
 
-interface ChatSession {
-  id: number;
-  title: string;
-  createdAt: string;
-}
-
 interface SidebarProps {
   readonly onNavigate?: () => void;
 }
 
 /**
  * @description 데스크톱 사이드바 및 모바일 드로어에서 공용으로 사용하는 내비게이션 컴포넌트입니다.
- * 주요 서비스 메뉴 이동, 최근 채팅 세션 목록 조회·제목 수정, 관리자 메뉴 및 로그아웃 기능을 제공합니다.
+ * 주요 서비스 메뉴 이동, 최근 채팅 세션 목록 조회·제목 수정·삭제, 관리자 메뉴 및 로그아웃 기능을 제공합니다.
  *
  * @param props - 내비게이션 클릭 콜백 (모바일 Sheet 닫기용)
  * @returns 서비스 내비게이션 및 세션 목록을 포함한 사이드바를 반환합니다.
@@ -89,7 +86,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       const res = await apiFetch('/chat/sessions');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as ChatSession[];
         setSessions(data);
       }
     } catch (err) {
@@ -109,7 +106,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const handleStartEdit = (session: ChatSession): void => {
     setEditingId(session.id);
-    setEditTitle(session.title);
+    setEditTitle(session.title || '새로운 상담');
   };
 
   const handleSaveEdit = async (id: number): Promise<void> => {
@@ -129,6 +126,28 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       logger.error({ err }, '세션 제목 수정 실패');
       setSessions(oldSessions);
       alert('제목 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteSession = async (id: number): Promise<void> => {
+    if (!confirm('이 상담 세션을 삭제하시겠습니까?')) return;
+
+    const oldSessions = [...sessions];
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+
+    try {
+      const res = await apiFetch(`/chat/sessions/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('삭제 실패');
+      globalThis.dispatchEvent(new Event('refresh-sessions'));
+      if (pathname === `/chat/${id}`) {
+        router.replace('/chat');
+      }
+    } catch (err) {
+      logger.error({ err }, '세션 삭제 실패');
+      setSessions(oldSessions);
+      alert('채팅 세션 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -216,6 +235,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 </li>
                 <li>
                   <Link
+                    href="/admin/inquiries"
+                    onClick={onNavigate}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                      pathname === '/admin/inquiries'
+                        ? 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )}
+                  >
+                    <MessageSquare size={18} aria-hidden="true" />
+                    1:1 문의 관리
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/admin/withdrawals"
                     onClick={onNavigate}
                     className={cn(
@@ -241,6 +275,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <ul className="space-y-1">
             {sessions.length > 0 ? (
               sessions.map((session) => {
+                const title = session.title || '새로운 상담';
                 const isActive = pathname === `/chat/${session.id}`;
                 const isEditing = editingId === session.id;
 
@@ -257,6 +292,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                           aria-label="채팅 제목 수정"
                         />
                         <Button
+                          type="button"
                           size="icon-xs"
                           variant="ghost"
                           onClick={() => handleSaveEdit(session.id)}
@@ -265,6 +301,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                           <Check size={14} aria-hidden="true" />
                         </Button>
                         <Button
+                          type="button"
                           size="icon-xs"
                           variant="ghost"
                           onClick={() => setEditingId(null)}
@@ -279,23 +316,34 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                           href={`/chat/${session.id}`}
                           onClick={onNavigate}
                           className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors',
+                            'flex items-center gap-3 rounded-lg px-3 py-2 pr-14 text-xs font-medium transition-colors',
                             isActive
                               ? 'bg-accent text-accent-foreground'
                               : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                           )}
                         >
                           <MessageCircle size={14} className="shrink-0" aria-hidden="true" />
-                          <span className="truncate flex-1">{session.title}</span>
+                          <span className="truncate flex-1">{title}</span>
                         </Link>
-                        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-80 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <Button
+                            type="button"
                             variant="ghost"
                             size="icon-xs"
                             onClick={() => handleStartEdit(session)}
-                            aria-label={`${session.title} 제목 수정`}
+                            aria-label={`${title} 제목 수정`}
                           >
                             <Edit2 size={12} aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => handleDeleteSession(session.id)}
+                            aria-label={`${title} 삭제`}
+                            className="hover:text-destructive"
+                          >
+                            <Trash2 size={12} aria-hidden="true" />
                           </Button>
                         </div>
                       </>

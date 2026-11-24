@@ -35,9 +35,6 @@ test-results
 # TypeScript build cache
 *.tsbuildinfo
 
-# Drizzle generated files
-drizzle/
-
 # Rust build artifacts
 target/
 **/target/

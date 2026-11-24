@@ -1,8 +1,10 @@
 'use client';
 
-import { AlertCircle, LogOut, User } from 'lucide-react';
+import { Activity, AlertCircle, LogOut, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import type { UserActivityLog } from 'types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,7 +32,7 @@ import { logger } from '@/utils/logger';
 
 /**
  * 마이페이지 컴포넌트입니다.
- * 사용자 프로필 정보 조회, 닉네임 수정, 회원 탈퇴 기능을 제공합니다.
+ * 사용자 프로필 조회/수정, 최근 활동·복약 로그 조회, 로그아웃, 회원 탈퇴 기능을 제공합니다.
  *
  * @returns 마이페이지 렌더링 결과
  */
@@ -40,6 +42,7 @@ export default function ProfilePage(): React.ReactNode {
 
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
+  const [activities, setActivities] = useState<UserActivityLog[]>([]);
   const [withdrawalReason, setWithdrawalReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,13 +51,7 @@ export default function ProfilePage(): React.ReactNode {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
 
-  /**
-   * 현재 로그인한 사용자의 프로필 정보를 서버로부터 비동기로 가져옵니다.
-   *
-   * @async
-   * @function fetchProfile
-   */
-  const fetchProfile = useCallback(async () => {
+  const fetchProfileAndActivity = useCallback(async () => {
     try {
       const { data: sessionData } = await authClient.getSession();
       if (!sessionData) {
@@ -64,14 +61,24 @@ export default function ProfilePage(): React.ReactNode {
 
       setEmail(sessionData.user.email);
 
-      const response = await apiFetch('/profile');
-      const result = await response.json();
+      const [profileRes, activityRes] = await Promise.all([
+        apiFetch('/profile'),
+        apiFetch('/activity'),
+      ]);
 
-      if (result.success && result.data) {
-        setNickname(result.data.nickname);
+      if (profileRes.ok) {
+        const result = await profileRes.json();
+        if (result.success && result.data) {
+          setNickname(result.data.nickname);
+        }
+      }
+
+      if (activityRes.ok) {
+        const logs = (await activityRes.json()) as UserActivityLog[];
+        setActivities(Array.isArray(logs) ? logs : []);
       }
     } catch (err) {
-      logger.error({ err }, 'Profile fetch error');
+      logger.error({ err }, '프로필 및 활동 내역 조회 오류');
     } finally {
       setIsLoading(false);
     }
@@ -79,16 +86,10 @@ export default function ProfilePage(): React.ReactNode {
 
   useEffect(() => {
     queueMicrotask(() => {
-      void fetchProfile();
+      void fetchProfileAndActivity();
     });
-  }, [fetchProfile]);
+  }, [fetchProfileAndActivity]);
 
-  /**
-   * 변경된 닉네임을 서버에 비동기로 업데이트합니다.
-   *
-   * @async
-   * @param {React.FormEvent} e - 폼 제출 이벤트 객체
-   */
   const handleUpdateNickname = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -114,11 +115,6 @@ export default function ProfilePage(): React.ReactNode {
     }
   };
 
-  /**
-   * 현재 세션을 종료하고 로그인 페이지로 이동합니다.
-   *
-   * @async
-   */
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
@@ -134,11 +130,6 @@ export default function ProfilePage(): React.ReactNode {
     }
   };
 
-  /**
-   * 회원 탈퇴 사유를 제출하고 탈퇴 절차를 비동기로 시작합니다.
-   *
-   * @async
-   */
   const handleWithdraw = async () => {
     if (!withdrawalReason.trim()) {
       alert('탈퇴 사유를 입력해주세요.');
@@ -174,7 +165,7 @@ export default function ProfilePage(): React.ReactNode {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User size={20} />
+            <User size={20} aria-hidden="true" />
             계정 설정
           </CardTitle>
           <CardDescription>개인 정보를 관리하세요.</CardDescription>
@@ -225,6 +216,44 @@ export default function ProfilePage(): React.ReactNode {
         </form>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Activity size={18} className="text-primary" aria-hidden="true" />
+            최근 활동 및 복약 로그
+          </CardTitle>
+          <CardDescription>최근 기록된 복약 체크 및 서비스 활동 내역입니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activities.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              아직 기록된 활동 내역이 없습니다.
+            </p>
+          ) : (
+            <ul className="space-y-2.5 max-h-64 overflow-y-auto">
+              {activities.slice(0, 20).map((log) => (
+                <li
+                  key={log.id}
+                  className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0 flex items-center gap-2">
+                    <Badge variant="outline" className="shrink-0">
+                      {log.action}
+                    </Badge>
+                    {log.details && (
+                      <span className="truncate text-muted-foreground">{log.details}</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {log.createdAt ? new Date(log.createdAt).toLocaleString('ko-KR') : '-'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="border-destructive/20 bg-destructive/5">
         <CardHeader>
           <CardTitle className="text-destructive text-lg">위험 구역</CardTitle>
@@ -238,7 +267,7 @@ export default function ProfilePage(): React.ReactNode {
             <DialogTrigger
               render={
                 <Button variant="destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
                   회원 탈퇴
                 </Button>
               }
@@ -248,7 +277,7 @@ export default function ProfilePage(): React.ReactNode {
                 <DialogTitle>정말로 탈퇴하시겠습니까?</DialogTitle>
                 <DialogDescription className="space-y-3 py-4">
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm flex gap-2">
-                    <AlertCircle className="shrink-0 h-4 w-4 mt-0.5" />
+                    <AlertCircle className="shrink-0 h-4 w-4 mt-0.5" aria-hidden="true" />
                     <span>
                       탈퇴 후 <strong>30일 동안</strong>은 동일 이메일로 재가입이 불가능하며, 30일
                       이내 로그인 시 탈퇴를 취소할 수 있습니다. 30일 경과 후 모든 데이터는 영구
@@ -270,10 +299,19 @@ export default function ProfilePage(): React.ReactNode {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsWithdrawDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsWithdrawDialogOpen(false)}
+                >
                   취소
                 </Button>
-                <Button variant="destructive" onClick={handleWithdraw} disabled={isWithdrawing}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleWithdraw}
+                  disabled={isWithdrawing}
+                >
                   {isWithdrawing ? '처리 중...' : '탈퇴 확정'}
                 </Button>
               </DialogFooter>
