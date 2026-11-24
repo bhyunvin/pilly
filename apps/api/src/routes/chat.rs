@@ -7,8 +7,9 @@ use axum::{
     routing::{get, patch, post},
 };
 use futures::{Stream, StreamExt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sqlx::{Executor, FromRow, PgPool, Postgres};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -18,6 +19,14 @@ use crate::{
     state::AppState,
     utils::security::{decrypt, encrypt},
 };
+
+const MAX_SESSION_TITLE_CHARS: usize = 100;
+const DEFAULT_SESSION_TITLE: &str = "새로운 상담";
+const SSE_CHANNEL_CAPACITY: usize = 32;
+
+const SYSTEM_PROMPT: &str = "당신은 전문 약사 AI \"Pilly\"입니다. \
+사용자의 건강 상태와 약물 정보를 바탕으로 빠르고 간결하며 친절하게 복약 지도를 수행하세요. \
+최종적인 의학적 진단은 내리지 말고, 필요시 의사/약사 상담을 권고하세요.";
 
 #[derive(Debug, Deserialize)]
 pub struct CreateSessionRequest {
@@ -45,9 +54,24 @@ pub struct UpdateSessionTitleRequest {
     pub title: String,
 }
 
-const SYSTEM_PROMPT: &str = "당신은 전문 약사 AI \"Pilly\"입니다. \
-사용자의 건강 상태와 약물 정보를 바탕으로 빠르고 간결하며 친절하게 복약 지도를 수행하세요. \
-최종적인 의학적 진단은 내리지 말고, 필요시 의사/약사 상담을 권고하세요.";
+#[derive(Debug, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MedicationSearchItem {
+    item_seq: String,
+    item_name: String,
+    entp_name: Option<String>,
+    chart: Option<String>,
+    drug_shape: Option<String>,
+    color_class1: Option<String>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+struct UserMedicationSummary {
+    #[serde(rename = "medicationName")]
+    name: String,
+    dosage: Option<String>,
+    frequency: Option<String>,
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -60,6 +84,30 @@ pub fn router() -> Router<AppState> {
         .route("/sessions/{id}/message", post(send_message))
 }
 
+async fn ensure_session_owner<'e, E>(
+    executor: E,
+    session_id: i32,
+    user_id: &str,
+) -> Result<(), AppError>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    let owned: Option<(i32,)> =
+        sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2 LIMIT 1")
+            .bind(session_id)
+            .bind(user_id)
+            .fetch_optional(executor)
+            .await?;
+
+    if owned.is_none() {
+        return Err(AppError::NotFound(
+            "채팅 세션을 찾을 수 없습니다.".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// 채팅 세션 제목 수정 (본인 세션만 가능)
 async fn update_session_title(
     State(state): State<AppState>,
@@ -68,10 +116,10 @@ async fn update_session_title(
     Json(body): Json<UpdateSessionTitleRequest>,
 ) -> AppResult<Json<Value>> {
     let title = body.title.trim();
-    if title.is_empty() || title.chars().count() > 100 {
-        return Err(AppError::BadRequest(
-            "제목은 1자 이상 100자 이하로 입력해 주세요.".to_string(),
-        ));
+    if title.is_empty() || title.chars().count() > MAX_SESSION_TITLE_CHARS {
+        return Err(AppError::BadRequest(format!(
+            "제목은 1자 이상 {MAX_SESSION_TITLE_CHARS}자 이하로 입력해 주세요."
+        )));
     }
 
     let updated: Option<ChatSession> = sqlx::query_as(
@@ -120,7 +168,7 @@ async fn create_session(
         .title
         .map(|t| t.trim().to_string())
         .filter(|t| !t.is_empty())
-        .unwrap_or_else(|| "새로운 상담".to_string());
+        .unwrap_or_else(|| DEFAULT_SESSION_TITLE.to_string());
 
     let session: ChatSession = sqlx::query_as(
         "INSERT INTO chat_sessions (user_id, title) VALUES ($1, $2) RETURNING id, user_id, title, created_at, updated_at",
@@ -143,19 +191,7 @@ async fn delete_session(
     Path(session_id): Path<i32>,
 ) -> AppResult<Json<Value>> {
     let mut tx = state.pool.begin().await?;
-
-    let owned: Option<(i32,)> =
-        sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2 LIMIT 1")
-            .bind(session_id)
-            .bind(&auth_user.user_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-
-    if owned.is_none() {
-        return Err(AppError::NotFound(
-            "채팅 세션을 찾을 수 없습니다.".to_string(),
-        ));
-    }
+    ensure_session_owner(&mut *tx, session_id, &auth_user.user_id).await?;
 
     sqlx::query(
         "UPDATE user_inquiries SET chat_session_id = NULL, chat_access_id = NULL, allow_chat_access = FALSE WHERE chat_session_id = $1 AND user_id = $2",
@@ -197,17 +233,7 @@ async fn get_session_logs(
     auth_user: AuthUser,
     Path(session_id): Path<i32>,
 ) -> AppResult<Json<Value>> {
-    let owned: Option<(i32,)> =
-        sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2 LIMIT 1")
-            .bind(session_id)
-            .bind(&auth_user.user_id)
-            .fetch_optional(&state.pool)
-            .await?;
-    if owned.is_none() {
-        return Err(AppError::NotFound(
-            "채팅 세션을 찾을 수 없습니다.".to_string(),
-        ));
-    }
+    ensure_session_owner(&state.pool, session_id, &auth_user.user_id).await?;
 
     let raw_logs: Vec<AiChatLog> = sqlx::query_as(
         "SELECT id, session_id, user_id, prompt, response, created_at FROM ai_chat_logs WHERE session_id = $1 AND user_id = $2 ORDER BY created_at ASC",
@@ -265,6 +291,16 @@ fn build_gemini_contents(history: &[ChatHistoryItem]) -> Result<(String, Vec<Val
         .collect();
 
     Ok((user_prompt, contents))
+}
+
+fn build_gemini_payload(contents: &[Value], tools: &Value) -> Value {
+    json!({
+        "system_instruction": {
+            "parts": [{ "text": SYSTEM_PROMPT }]
+        },
+        "contents": contents,
+        "tools": tools,
+    })
 }
 
 #[derive(Debug, Default)]
@@ -329,6 +365,21 @@ impl SseLineParser {
     }
 }
 
+async fn dispatch_sse_events(
+    events: ParsedSseEvents,
+    tx: &mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+    full_text: &mut String,
+    pending_fc: &mut Option<(String, Value)>,
+) {
+    if let Some(fc) = events.function_call {
+        *pending_fc = Some(fc);
+    }
+    for text in events.texts {
+        full_text.push_str(&text);
+        let _ = tx.send(Ok(bytes::Bytes::from(text))).await;
+    }
+}
+
 async fn consume_gemini_sse_stream<S, E>(
     mut stream: S,
     tx: &mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
@@ -345,13 +396,7 @@ where
         match chunk_res {
             Ok(chunk) => {
                 let events = parser.feed(&chunk);
-                if let Some(fc) = events.function_call {
-                    pending_fc = Some(fc);
-                }
-                for text in events.texts {
-                    full_text.push_str(&text);
-                    let _ = tx.send(Ok(bytes::Bytes::from(text))).await;
-                }
+                dispatch_sse_events(events, tx, full_text, &mut pending_fc).await;
             }
             Err(err) => {
                 tracing::error!("Gemini SSE 스트림 수신 오류: {:?}", err);
@@ -361,15 +406,29 @@ where
     }
 
     let trailing = parser.finish();
-    if let Some(fc) = trailing.function_call {
-        pending_fc = Some(fc);
-    }
-    for text in trailing.texts {
-        full_text.push_str(&text);
-        let _ = tx.send(Ok(bytes::Bytes::from(text))).await;
-    }
+    dispatch_sse_events(trailing, tx, full_text, &mut pending_fc).await;
 
     pending_fc
+}
+
+async fn persist_encrypted_response(pool: &PgPool, log_id: i32, full_text: &str, enc_key: &str) {
+    match encrypt(full_text, enc_key) {
+        Ok(encrypted_response) => {
+            if let Err(err) = sqlx::query("UPDATE ai_chat_logs SET response = $1 WHERE id = $2")
+                .bind(&encrypted_response)
+                .bind(log_id)
+                .execute(pool)
+                .await
+            {
+                tracing::error!("AI 응답 암호화 저장 실패: {:?}", err);
+            }
+        }
+        Err(err) => {
+            tracing::error!(
+                "AI 응답 암호화 실패로 평문 저장을 중단합니다 (log_id={log_id}): {err}"
+            );
+        }
+    }
 }
 
 /// 실시간 AI 메시징 및 스트리밍 응답 (AES-256-GCM 암호화 저장)
@@ -379,17 +438,7 @@ async fn send_message(
     Path(session_id): Path<i32>,
     Json(body): Json<SendMessageRequest>,
 ) -> AppResult<Response> {
-    let owned: Option<(i32,)> =
-        sqlx::query_as("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2")
-            .bind(session_id)
-            .bind(&auth_user.user_id)
-            .fetch_optional(&state.pool)
-            .await?;
-    if owned.is_none() {
-        return Err(AppError::NotFound(
-            "채팅 세션을 찾을 수 없습니다.".to_string(),
-        ));
-    }
+    ensure_session_owner(&state.pool, session_id, &auth_user.user_id).await?;
 
     let (user_prompt, mut contents) = build_gemini_contents(&body.history)?;
     let encrypted_prompt = encrypt(&user_prompt, &state.config.encryption_key)?;
@@ -415,13 +464,7 @@ async fn send_message(
     );
 
     let tools = gemini_tools();
-    let payload = json!({
-        "system_instruction": {
-            "parts": [{ "text": SYSTEM_PROMPT }]
-        },
-        "contents": contents,
-        "tools": tools,
-    });
+    let payload = build_gemini_payload(&contents, &tools);
 
     let res = state
         .http_client
@@ -438,7 +481,7 @@ async fn send_message(
         )));
     }
 
-    let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(32);
+    let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(SSE_CHANNEL_CAPACITY);
     let pool = state.pool.clone();
     let http_client = state.http_client.clone();
     let enc_key = state.config.encryption_key.clone();
@@ -473,13 +516,7 @@ async fn send_message(
                 }]
             }));
 
-            let followup_payload = json!({
-                "system_instruction": {
-                    "parts": [{ "text": SYSTEM_PROMPT }]
-                },
-                "contents": contents,
-                "tools": tools,
-            });
+            let followup_payload = build_gemini_payload(&contents, &tools);
 
             match http_client.post(&url).json(&followup_payload).send().await {
                 Ok(followup_res) if followup_res.status().is_success() => {
@@ -499,23 +536,7 @@ async fn send_message(
             }
         }
 
-        match encrypt(&full_text, &enc_key) {
-            Ok(encrypted_response) => {
-                if let Err(err) = sqlx::query("UPDATE ai_chat_logs SET response = $1 WHERE id = $2")
-                    .bind(&encrypted_response)
-                    .bind(log_id)
-                    .execute(&pool)
-                    .await
-                {
-                    tracing::error!("AI 응답 암호화 저장 실패: {:?}", err);
-                }
-            }
-            Err(err) => {
-                tracing::error!(
-                    "AI 응답 암호화 실패로 평문 저장을 중단합니다 (log_id={log_id}): {err}"
-                );
-            }
-        }
+        persist_encrypted_response(&pool, log_id, &full_text, &enc_key).await;
     });
 
     let body = Body::from_stream(tokio_stream::wrappers::ReceiverStream::new(rx));
@@ -559,12 +580,7 @@ fn gemini_tools() -> Value {
 }
 
 /// 모델이 요청한 Function Call을 내부 DB에서 실행하고 결과를 JSON으로 반환합니다.
-async fn execute_tool_call(
-    pool: &sqlx::PgPool,
-    user_id: &str,
-    fn_name: &str,
-    args: &Value,
-) -> Value {
+async fn execute_tool_call(pool: &PgPool, user_id: &str, fn_name: &str, args: &Value) -> Value {
     match fn_name {
         "searchMedication" => {
             let query = args["query"].as_str().unwrap_or("").trim();
@@ -572,7 +588,7 @@ async fn execute_tool_call(
                 return json!({ "medications": [], "message": "검색어가 비어 있습니다." });
             }
             let pattern = format!("%{query}%");
-            let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>)>(
+            let meds: Vec<MedicationSearchItem> = sqlx::query_as(
                 "SELECT item_seq, item_name, entp_name, chart, drug_shape, color_class1 FROM pill_catalog WHERE item_name ILIKE $1 LIMIT 5",
             )
             .bind(&pattern)
@@ -580,43 +596,16 @@ async fn execute_tool_call(
             .await
             .unwrap_or_default();
 
-            let meds: Vec<Value> = rows
-                .into_iter()
-                .map(
-                    |(item_seq, name, company, chart, drug_shape, color_class1)| {
-                        json!({
-                            "itemSeq": item_seq,
-                            "itemName": name,
-                            "entpName": company,
-                            "chart": chart,
-                            "drugShape": drug_shape,
-                            "colorClass1": color_class1,
-                        })
-                    },
-                )
-                .collect();
-
             json!({ "medications": meds })
         }
         "getMyMedications" => {
-            let rows = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
+            let meds: Vec<UserMedicationSummary> = sqlx::query_as(
                 "SELECT name, dosage, frequency FROM user_medications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20",
             )
             .bind(user_id)
             .fetch_all(pool)
             .await
             .unwrap_or_default();
-
-            let meds: Vec<Value> = rows
-                .into_iter()
-                .map(|(name, dosage, frequency)| {
-                    json!({
-                        "medicationName": name,
-                        "dosage": dosage,
-                        "frequency": frequency,
-                    })
-                })
-                .collect();
 
             json!({ "myMedications": meds })
         }

@@ -103,18 +103,19 @@ export default function AdminUsersPage(): React.ReactNode {
     }
   };
 
-  const restrictUser = async (userId: string) => {
+  const updateUserStatus = async (
+    userId: string,
+    payload: { status: 'RESTRICTED' | 'ACTIVE'; reason?: string },
+    fallbackMessage: string,
+  ) => {
     try {
       const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          status: 'RESTRICTED',
-          reason: restrictionReason,
-        }),
+        body: JSON.stringify(payload),
       });
       const statusUpdateResponse = await httpResponse.json();
       if (!httpResponse.ok) {
-        alert(statusUpdateResponse.message || '이용 제한 처리에 실패했습니다.');
+        alert(statusUpdateResponse.message || fallbackMessage);
         return;
       }
       if (statusUpdateResponse.success) {
@@ -122,31 +123,19 @@ export default function AdminUsersPage(): React.ReactNode {
         setRestrictionReason('');
       }
     } catch (err) {
-      logger.error({ err }, 'Admin restrict user error');
+      logger.error({ err, status: payload.status }, 'Admin update user status error');
     }
   };
 
-  const activateUser = async (userId: string) => {
-    try {
-      const httpResponse = await apiFetch(`/admin/users/${userId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'ACTIVE',
-        }),
-      });
-      const statusUpdateResponse = await httpResponse.json();
-      if (!httpResponse.ok) {
-        alert(statusUpdateResponse.message || '이용 제한 해제에 실패했습니다.');
-        return;
-      }
-      if (statusUpdateResponse.success) {
-        await Promise.all([fetchUsers(), fetchUserDetails(userId)]);
-        setRestrictionReason('');
-      }
-    } catch (err) {
-      logger.error({ err }, 'Admin activate user error');
-    }
-  };
+  const restrictUser = (userId: string) =>
+    updateUserStatus(
+      userId,
+      { status: 'RESTRICTED', reason: restrictionReason },
+      '이용 제한 처리에 실패했습니다.',
+    );
+
+  const activateUser = (userId: string) =>
+    updateUserStatus(userId, { status: 'ACTIVE' }, '이용 제한 해제에 실패했습니다.');
 
   useEffect(() => {
     queueMicrotask(() => {

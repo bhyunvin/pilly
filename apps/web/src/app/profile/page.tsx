@@ -30,6 +30,8 @@ import { clearAuthTokenCache, useApi } from '@/hooks/useApi';
 import { authClient } from '@/lib/auth';
 import { logger } from '@/utils/logger';
 
+const MAX_VISIBLE_ACTIVITIES = 20;
+
 /**
  * 마이페이지 컴포넌트입니다.
  * 사용자 프로필 조회/수정, 최근 활동·복약 로그 조회, 로그아웃, 회원 탈퇴 기능을 제공합니다.
@@ -231,7 +233,7 @@ export default function ProfilePage(): React.ReactNode {
             </p>
           ) : (
             <ul className="space-y-2.5 max-h-64 overflow-y-auto">
-              {activities.slice(0, 20).map((log) => (
+              {activities.slice(0, MAX_VISIBLE_ACTIVITIES).map((log) => (
                 <li
                   key={log.id}
                   className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 text-sm"

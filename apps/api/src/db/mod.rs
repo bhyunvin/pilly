@@ -1,4 +1,4 @@
-use std::env;
+use std::{collections::HashMap, env};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -162,6 +162,32 @@ pub struct InquiryAttachment {
     pub file_url: String,
     pub original_name: String,
     pub created_at: Option<DateTime<Utc>>,
+}
+
+/// 문의 ID 목록에 속한 첨부파일을 일괄 조회해 `inquiry_id` 기준으로 그룹화합니다.
+pub async fn fetch_inquiry_attachments_map(
+    pool: &PgPool,
+    inquiry_ids: &[i32],
+) -> Result<HashMap<i32, Vec<InquiryAttachment>>, sqlx::Error> {
+    if inquiry_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let attachments: Vec<InquiryAttachment> = sqlx::query_as(
+        "SELECT id, inquiry_id, file_url, original_name, created_at FROM inquiry_attachments WHERE inquiry_id = ANY($1) ORDER BY id ASC",
+    )
+    .bind(inquiry_ids)
+    .fetch_all(pool)
+    .await?;
+
+    let mut attachment_map: HashMap<i32, Vec<InquiryAttachment>> = HashMap::new();
+    for att in attachments {
+        if let Some(inq_id) = att.inquiry_id {
+            attachment_map.entry(inq_id).or_default().push(att);
+        }
+    }
+
+    Ok(attachment_map)
 }
 
 #[cfg(test)]

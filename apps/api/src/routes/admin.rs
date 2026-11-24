@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -9,17 +7,22 @@ use axum::{
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::FromRow;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::{
-    db::{AiChatLog, ChatAccessApproval, InquiryAttachment, UserProfile, UserRestrictionHistory},
+    db::{
+        AiChatLog, ChatAccessApproval, InquiryAttachment, UserProfile, UserRestrictionHistory,
+        fetch_inquiry_attachments_map,
+    },
     error::{AppError, AppResult},
     middleware::auth::AdminUser,
     mq::PillyEvent,
     state::AppState,
     utils::{mail::send_jit_access_notification, security::decrypt},
 };
+
+const JIT_ACCESS_VALID_HOURS: i64 = 24;
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateStatusRequest {
@@ -85,6 +88,15 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
             .zip(b.iter())
             .fold(0u8, |diff, (x, y)| diff | (x ^ y))
             == 0
+}
+
+fn reject_self_modification(admin_id: &str, target_user_id: &str) -> Result<(), AppError> {
+    if admin_id == target_user_id {
+        return Err(AppError::BadRequest(
+            "본인 계정의 권한이나 이용 상태는 변경할 수 없습니다.".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn spawn_admin_audit(state: &AppState, admin_id: String, action: String, target_id: String) {
@@ -180,27 +192,15 @@ async fn list_admin_inquiries(
     }
 
     let inquiry_ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
-    let attachments: Vec<InquiryAttachment> = sqlx::query_as(
-        "SELECT id, inquiry_id, file_url, original_name, created_at FROM inquiry_attachments WHERE inquiry_id = ANY($1) ORDER BY id ASC",
-    )
-    .bind(&inquiry_ids)
-    .fetch_all(&state.pool)
-    .await?;
-
-    let mut attachment_map: HashMap<i32, Vec<InquiryAttachment>> = HashMap::new();
-    for att in attachments {
-        if let Some(inq_id) = att.inquiry_id {
-            attachment_map.entry(inq_id).or_default().push(att);
-        }
-    }
+    let mut attachment_map = fetch_inquiry_attachments_map(&state.pool, &inquiry_ids).await?;
 
     let items: Vec<AdminInquiryItem> = rows
         .into_iter()
         .map(|inquiry| {
-            let atts = attachment_map.remove(&inquiry.id).unwrap_or_default();
+            let attachments = attachment_map.remove(&inquiry.id).unwrap_or_default();
             AdminInquiryItem {
                 inquiry,
-                attachments: atts,
+                attachments,
             }
         })
         .collect();
@@ -293,11 +293,7 @@ async fn toggle_user_role(
     admin: AdminUser,
     Path(user_id): Path<String>,
 ) -> AppResult<Json<Value>> {
-    if admin.user_id == user_id {
-        return Err(AppError::BadRequest(
-            "본인 계정의 권한이나 이용 상태는 변경할 수 없습니다.".to_string(),
-        ));
-    }
+    reject_self_modification(&admin.user_id, &user_id)?;
 
     let current_role: Option<(String,)> =
         sqlx::query_as("SELECT role FROM user_profiles WHERE user_id = $1 LIMIT 1")
@@ -336,11 +332,7 @@ async fn update_user_status(
     Path(user_id): Path<String>,
     Json(body): Json<UpdateStatusRequest>,
 ) -> AppResult<Json<Value>> {
-    if admin.user_id == user_id {
-        return Err(AppError::BadRequest(
-            "본인 계정의 권한이나 이용 상태는 변경할 수 없습니다.".to_string(),
-        ));
-    }
+    reject_self_modification(&admin.user_id, &user_id)?;
 
     let exists: Option<(String,)> =
         sqlx::query_as("SELECT user_id FROM user_profiles WHERE user_id = $1 LIMIT 1")
@@ -408,25 +400,23 @@ async fn update_user_status(
     })))
 }
 
-/// JIT(Just-In-Time) 채팅 로그 접근 제어 (원자적 최초 열람 처리, 24시간 유효, 감사 로그 발행)
-async fn get_jit_chat_logs(
-    State(state): State<AppState>,
-    admin: AdminUser,
-    Path(target): Path<String>,
-) -> AppResult<Json<Value>> {
-    let approval: Option<ChatAccessApproval> = if let Ok(approval_uuid) = Uuid::parse_str(&target) {
+async fn find_chat_access_approval(
+    pool: &PgPool,
+    target: &str,
+) -> Result<ChatAccessApproval, AppError> {
+    let approval: Option<ChatAccessApproval> = if let Ok(approval_uuid) = Uuid::parse_str(target) {
         sqlx::query_as(
             "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE id = $1 LIMIT 1",
         )
         .bind(approval_uuid)
-        .fetch_optional(&state.pool)
+        .fetch_optional(pool)
         .await?
     } else if let Ok(session_id) = target.parse::<i32>() {
         sqlx::query_as(
             "SELECT id, user_id, chat_session_id, granted_at, accessed_at, expires_at, created_at FROM chat_access_approvals WHERE chat_session_id = $1 ORDER BY created_at DESC LIMIT 1",
         )
         .bind(session_id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(pool)
         .await?
     } else {
         return Err(AppError::BadRequest(
@@ -434,18 +424,51 @@ async fn get_jit_chat_logs(
         ));
     };
 
-    let Some(approval) = approval else {
-        return Err(AppError::Forbidden(
-            "해당 채팅방에 대한 접근 권한이 승인되지 않았습니다.".to_string(),
-        ));
-    };
+    approval.ok_or_else(|| {
+        AppError::Forbidden("해당 채팅방에 대한 접근 권한이 승인되지 않았습니다.".to_string())
+    })
+}
 
+fn spawn_jit_access_notification(state: &AppState, target_user_id: String, session_id: i32) {
+    let pool = state.pool.clone();
+    let config = state.config.clone();
+    tokio::spawn(async move {
+        let email_opt: Option<String> =
+            sqlx::query_scalar("SELECT email FROM neon_auth.\"user\" WHERE id = $1 LIMIT 1")
+                .bind(&target_user_id)
+                .fetch_optional(&pool)
+                .await
+                .ok()
+                .flatten();
+
+        let Some(to_email) = email_opt else {
+            tracing::info!(
+                "사용자 이메일을 찾을 수 없어 JIT 열람 알림 발송을 건너뜁니다. (user_id={}, session_id={})",
+                target_user_id,
+                session_id
+            );
+            return;
+        };
+
+        if let Err(err) = send_jit_access_notification(&config, &to_email, session_id).await {
+            tracing::error!("JIT 열람 알림 이메일 발송 오류: {}", err);
+        }
+    });
+}
+
+/// JIT(Just-In-Time) 채팅 로그 접근 제어 (원자적 최초 열람 처리, 24시간 유효, 감사 로그 발행)
+async fn get_jit_chat_logs(
+    State(state): State<AppState>,
+    admin: AdminUser,
+    Path(target): Path<String>,
+) -> AppResult<Json<Value>> {
+    let approval = find_chat_access_approval(&state.pool, &target).await?;
     let session_id = approval
         .chat_session_id
         .ok_or_else(|| AppError::NotFound("연결된 채팅 세션을 찾을 수 없습니다.".to_string()))?;
 
     let now = Utc::now();
-    let expires_at = now + Duration::hours(24);
+    let expires_at = now + Duration::hours(JIT_ACCESS_VALID_HOURS);
 
     // 최초 열람인 경우 원자적으로 `accessed_at IS NULL` 조건부 업데이트를 시도해 중복 이메일 발송 차단
     let first_claimed: Option<(Option<DateTime<Utc>>,)> = sqlx::query_as(
@@ -458,32 +481,7 @@ async fn get_jit_chat_logs(
     .await?;
 
     if first_claimed.is_some() {
-        let pool_clone = state.pool.clone();
-        let config_clone = state.config.clone();
-        let target_user_id = approval.user_id.clone();
-        tokio::spawn(async move {
-            let email_opt: Option<String> =
-                sqlx::query_scalar("SELECT email FROM neon_auth.\"user\" WHERE id = $1 LIMIT 1")
-                    .bind(&target_user_id)
-                    .fetch_optional(&pool_clone)
-                    .await
-                    .ok()
-                    .flatten();
-
-            if let Some(to_email) = email_opt {
-                if let Err(err) =
-                    send_jit_access_notification(&config_clone, &to_email, session_id).await
-                {
-                    tracing::error!("JIT 열람 알림 이메일 발송 오류: {}", err);
-                }
-            } else {
-                tracing::info!(
-                    "사용자 이메일을 찾을 수 없어 JIT 열람 알림 발송을 건너뜁니다. (user_id={}, session_id={})",
-                    target_user_id,
-                    session_id
-                );
-            }
-        });
+        spawn_jit_access_notification(&state, approval.user_id.clone(), session_id);
     } else if let Some(existing_expires_at) = approval.expires_at
         && now > existing_expires_at
     {

@@ -17,6 +17,8 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { logger } from '@/utils/logger';
 
+const GRACE_PERIOD_DAYS = 30;
+
 /**
  * 관리자용 탈퇴 예정자 관리 페이지 컴포넌트입니다.
  * 탈퇴를 요청한 사용자 목록과 데이터 영구 삭제 예정일을 조회할 수 있습니다.
@@ -102,7 +104,6 @@ export default function AdminWithdrawalsPage(): React.ReactNode {
           <TableBody>
             {withdrawals.length > 0 ? (
               withdrawals.map((user) => {
-                const GRACE_PERIOD_DAYS = 30;
                 const deletedAt = user.deletedAt ? new Date(user.deletedAt) : null;
                 const deletionDate = deletedAt ? addDays(deletedAt, GRACE_PERIOD_DAYS) : null;
                 return (

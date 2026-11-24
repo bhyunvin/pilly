@@ -31,6 +31,36 @@ interface SidebarProps {
   readonly onNavigate?: () => void;
 }
 
+const NAV_ITEMS = [
+  { label: '홈', icon: Home, href: '/' },
+  { label: '의약품 검색', icon: Search, href: '/search' },
+  { label: '복약 관리', icon: Pill, href: '/medications' },
+  { label: '새 상담 시작', icon: MessageCircle, href: '/chat' },
+  { label: '1:1 문의', icon: HelpCircle, href: '/inquiry' },
+  { label: '내 프로필', icon: User, href: '/profile' },
+] as const;
+
+const ADMIN_NAV_ITEMS = [
+  {
+    label: '사용자 관리',
+    icon: ShieldAlert,
+    href: '/admin/users',
+    activeClass: 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none',
+  },
+  {
+    label: '1:1 문의 관리',
+    icon: MessageSquare,
+    href: '/admin/inquiries',
+    activeClass: 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none',
+  },
+  {
+    label: '탈퇴 예정자 관리',
+    icon: UserMinus,
+    href: '/admin/withdrawals',
+    activeClass: 'bg-destructive/10 text-destructive border-l-4 border-destructive rounded-l-none',
+  },
+] as const;
+
 /**
  * @description 데스크톱 사이드바 및 모바일 드로어에서 공용으로 사용하는 내비게이션 컴포넌트입니다.
  * 주요 서비스 메뉴 이동, 최근 채팅 세션 목록 조회·제목 수정·삭제, 관리자 메뉴 및 로그아웃 기능을 제공합니다.
@@ -48,15 +78,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const navItems = [
-    { label: '홈', icon: Home, href: '/' },
-    { label: '의약품 검색', icon: Search, href: '/search' },
-    { label: '복약 관리', icon: Pill, href: '/medications' },
-    { label: '새 상담 시작', icon: MessageCircle, href: '/chat' },
-    { label: '1:1 문의', icon: HelpCircle, href: '/inquiry' },
-    { label: '내 프로필', icon: User, href: '/profile' },
-  ];
 
   const fetchProfile = useCallback(async (): Promise<void> => {
     try {
@@ -189,7 +210,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             Menu
           </p>
           <ul className="space-y-1">
-            {navItems.map(({ label, icon: Icon, href }) => {
+            {NAV_ITEMS.map(({ label, icon: Icon, href }) => {
               const isActive = pathname === href;
               return (
                 <li key={href}>
@@ -218,51 +239,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 Admin Panel
               </p>
               <ul className="space-y-1">
-                <li>
-                  <Link
-                    href="/admin/users"
-                    onClick={onNavigate}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                      pathname === '/admin/users'
-                        ? 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )}
-                  >
-                    <ShieldAlert size={18} aria-hidden="true" />
-                    사용자 관리
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/admin/inquiries"
-                    onClick={onNavigate}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                      pathname === '/admin/inquiries'
-                        ? 'bg-primary/10 text-primary border-l-4 border-primary rounded-l-none'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )}
-                  >
-                    <MessageSquare size={18} aria-hidden="true" />
-                    1:1 문의 관리
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/admin/withdrawals"
-                    onClick={onNavigate}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
-                      pathname === '/admin/withdrawals'
-                        ? 'bg-destructive/10 text-destructive border-l-4 border-destructive rounded-l-none'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )}
-                  >
-                    <UserMinus size={18} aria-hidden="true" />
-                    탈퇴 예정자 관리
-                  </Link>
-                </li>
+                {ADMIN_NAV_ITEMS.map(({ label, icon: Icon, href, activeClass }) => (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      onClick={onNavigate}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                        pathname === href
+                          ? activeClass
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      )}
+                    >
+                      <Icon size={18} aria-hidden="true" />
+                      {label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
           )}

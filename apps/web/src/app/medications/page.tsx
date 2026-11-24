@@ -23,6 +23,9 @@ import { Label } from '@/components/ui/label';
 import { useApi } from '@/hooks/useApi';
 import { logger } from '@/utils/logger';
 
+const EMPTY_MEDICATION_FORM = { name: '', dosage: '', frequency: '' };
+const MAX_VISIBLE_HISTORY = 10;
+
 /**
  * 사용자별 복약 정보 관리 페이지 컴포넌트입니다.
  * 약물 추가/수정/삭제, 오늘 복용 완료·건너뛰기 체크 및 복약 이력 펼침 조회 기능을 제공합니다.
@@ -33,10 +36,10 @@ export default function MedicationsPage() {
   const [medications, setMedications] = useState<UserMedication[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '' });
+  const [newMed, setNewMed] = useState(EMPTY_MEDICATION_FORM);
 
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState({ name: '', dosage: '', frequency: '' });
+  const [editDraft, setEditDraft] = useState(EMPTY_MEDICATION_FORM);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [recordingId, setRecordingId] = useState<number | null>(null);
@@ -83,7 +86,7 @@ export default function MedicationsPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setMedications((prev) => [data.medication, ...prev]);
-        setNewMed({ name: '', dosage: '', frequency: '' });
+        setNewMed(EMPTY_MEDICATION_FORM);
       } else {
         alert(data.message || '복약 정보 추가에 실패했습니다.');
       }
@@ -225,7 +228,7 @@ export default function MedicationsPage() {
 
     return (
       <ul className="space-y-1.5 max-h-40 overflow-y-auto">
-        {historyItems.slice(0, 10).map((item) => (
+        {historyItems.slice(0, MAX_VISIBLE_HISTORY).map((item) => (
           <li
             key={item.id}
             className="flex items-center justify-between text-xs bg-muted/40 rounded px-2.5 py-1.5"

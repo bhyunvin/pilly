@@ -18,7 +18,9 @@ use crate::{
 };
 
 const MAX_IMAGE_SIZE_BYTES: usize = 10 * 1024 * 1024;
+const IMAGE_BODY_OVERHEAD_BYTES: usize = 256 * 1024;
 const ALLOWED_IMAGE_MIMES: [&str; 4] = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const VISION_PROMPT: &str = "이 사진에서 약 정보를 추출해 주세요. 사진에 보이는 모든 약품명(name), 용량 및 용법(dosage), 복용 빈도(frequency)를 JSON 배열 {\"medications\": [{\"name\": \"...\", \"dosage\": \"...\", \"frequency\": \"...\"}]} 형식으로만 응답해 주세요.";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,8 +63,67 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/analyze-image",
-            post(analyze_image).layer(DefaultBodyLimit::max(MAX_IMAGE_SIZE_BYTES + 256 * 1024)),
+            post(analyze_image).layer(DefaultBodyLimit::max(
+                MAX_IMAGE_SIZE_BYTES + IMAGE_BODY_OVERHEAD_BYTES,
+            )),
         )
+}
+
+fn validate_medication_name(raw: &str) -> Result<&str, AppError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::BadRequest(
+            "약물 이름을 입력해 주세요.".to_string(),
+        ));
+    }
+    Ok(trimmed)
+}
+
+async fn extract_validated_image(mut multipart: Multipart) -> Result<(Vec<u8>, String), AppError> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart 파싱 실패: {e}")))?
+    {
+        if field.name() != Some("image") {
+            continue;
+        }
+
+        let mime_type = field
+            .content_type()
+            .map(|v| {
+                v.split(';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_ascii_lowercase()
+            })
+            .unwrap_or_else(|| "image/jpeg".to_string());
+
+        if !ALLOWED_IMAGE_MIMES.contains(&mime_type.as_str()) {
+            return Err(AppError::BadRequest(
+                "지원하지 않는 이미지 형식입니다. (JPEG, PNG, WEBP, HEIC만 허용)".to_string(),
+            ));
+        }
+
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|e| AppError::BadRequest(format!("이미지 읽기 실패: {e}")))?;
+
+        if bytes.is_empty() {
+            return Err(AppError::BadRequest("빈 이미지 파일입니다.".to_string()));
+        }
+        if bytes.len() > MAX_IMAGE_SIZE_BYTES {
+            return Err(AppError::BadRequest(
+                "이미지 파일 크기는 10MB 이하여야 합니다.".to_string(),
+            ));
+        }
+
+        return Ok((bytes.to_vec(), mime_type));
+    }
+
+    Err(AppError::BadRequest("image 필드가 필요합니다.".to_string()))
 }
 
 /// 사용자의 복약 목록 조회
@@ -89,13 +150,7 @@ async fn create_medication(
     auth_user: AuthUser,
     Json(body): Json<CreateMedicationRequest>,
 ) -> AppResult<(StatusCode, Json<Value>)> {
-    let name = body.name.trim();
-    if name.is_empty() {
-        return Err(AppError::BadRequest(
-            "약물 이름을 입력해 주세요.".to_string(),
-        ));
-    }
-
+    let name = validate_medication_name(&body.name)?;
     let start_date = body.start_date.unwrap_or_else(|| Utc::now().to_rfc3339());
 
     let med: UserMedication = sqlx::query_as(
@@ -125,12 +180,7 @@ async fn update_medication(
     Path(id): Path<i32>,
     Json(body): Json<UpdateMedicationRequest>,
 ) -> AppResult<Json<Value>> {
-    let name = body.name.trim();
-    if name.is_empty() {
-        return Err(AppError::BadRequest(
-            "약물 이름을 입력해 주세요.".to_string(),
-        ));
-    }
+    let name = validate_medication_name(&body.name)?;
 
     let updated: Option<UserMedication> = sqlx::query_as(
         "UPDATE user_medications SET name = $1, dosage = $2, frequency = $3 \
@@ -266,56 +316,9 @@ async fn record_medication_history(
 async fn analyze_image(
     State(state): State<AppState>,
     _auth_user: AuthUser,
-    mut multipart: Multipart,
+    multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    let mut image_bytes: Option<Vec<u8>> = None;
-    let mut mime_type = "image/jpeg".to_string();
-
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::BadRequest(format!("Multipart 파싱 실패: {e}")))?
-    {
-        if field.name() == Some("image") {
-            let ct = field
-                .content_type()
-                .map(|v| {
-                    v.split(';')
-                        .next()
-                        .unwrap_or("")
-                        .trim()
-                        .to_ascii_lowercase()
-                })
-                .unwrap_or_else(|| "image/jpeg".to_string());
-
-            if !ALLOWED_IMAGE_MIMES.contains(&ct.as_str()) {
-                return Err(AppError::BadRequest(
-                    "지원하지 않는 이미지 형식입니다. (JPEG, PNG, WEBP, HEIC만 허용)".to_string(),
-                ));
-            }
-            mime_type = ct;
-
-            let bytes = field
-                .bytes()
-                .await
-                .map_err(|e| AppError::BadRequest(format!("이미지 읽기 실패: {e}")))?;
-
-            if bytes.is_empty() {
-                return Err(AppError::BadRequest("빈 이미지 파일입니다.".to_string()));
-            }
-            if bytes.len() > MAX_IMAGE_SIZE_BYTES {
-                return Err(AppError::BadRequest(
-                    "이미지 파일 크기는 10MB 이하여야 합니다.".to_string(),
-                ));
-            }
-
-            image_bytes = Some(bytes.to_vec());
-            break;
-        }
-    }
-
-    let bytes =
-        image_bytes.ok_or_else(|| AppError::BadRequest("image 필드가 필요합니다.".to_string()))?;
+    let (bytes, mime_type) = extract_validated_image(multipart).await?;
     let base64_image = BASE64.encode(&bytes);
 
     let url = format!(
@@ -326,9 +329,7 @@ async fn analyze_image(
     let payload = json!({
         "contents": [{
             "parts": [
-                {
-                    "text": "이 사진에서 약 정보를 추출해 주세요. 사진에 보이는 모든 약품명(name), 용량 및 용법(dosage), 복용 빈도(frequency)를 JSON 배열 {\"medications\": [{\"name\": \"...\", \"dosage\": \"...\", \"frequency\": \"...\"}]} 형식으로만 응답해 주세요."
-                },
+                { "text": VISION_PROMPT },
                 {
                     "inline_data": {
                         "mime_type": mime_type,

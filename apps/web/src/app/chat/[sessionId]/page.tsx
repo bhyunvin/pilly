@@ -88,6 +88,10 @@ interface Message {
   isGreeting?: boolean;
 }
 
+const INITIAL_GREETING =
+  '안녕하세요! Pilly AI 복약 가이드입니다. 약물 복용법이나 주의사항에 대해 무엇이든 물어보세요.';
+const MAX_HISTORY_MESSAGES = 10;
+
 /**
  * 개별 채팅 세션 내에서 AI와 대화를 주고받는 페이지 컴포넌트입니다.
  *
@@ -126,8 +130,7 @@ export default function ChatSessionPage(): React.ReactNode {
         history.push({
           id: crypto.randomUUID(),
           role: 'ai',
-          content:
-            '안녕하세요! Pilly AI 복약 가이드입니다. 약물 복용법이나 주의사항에 대해 무엇이든 물어보세요.',
+          content: INITIAL_GREETING,
           isGreeting: true,
         });
       } else {
@@ -165,6 +168,16 @@ export default function ChatSessionPage(): React.ReactNode {
     setTtsEnabled((prev) => !prev);
   };
 
+  const updateLastMessage = useCallback((updater: (currentContent: string) => string) => {
+    setMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const lastIndex = prev.length - 1;
+      return prev.map((msg, index) =>
+        index === lastIndex ? { ...msg, content: updater(msg.content) } : msg,
+      );
+    });
+  }, []);
+
   /**
    * 사용자 질문 텍스트를 받아 AI 스트리밍 응답을 수신합니다.
    * 초기 로컬 인사말(`isGreeting`)은 Gemini 멀티턴 규격 보호를 위해 API payload에서 제외합니다.
@@ -183,7 +196,7 @@ export default function ChatSessionPage(): React.ReactNode {
       try {
         const historyPayload = conversationMessages
           .filter((msg) => !msg.isGreeting && msg.content.trim().length > 0)
-          .slice(-10)
+          .slice(-MAX_HISTORY_MESSAGES)
           .map((msg) => ({
             role: msg.role === 'ai' ? 'model' : 'user',
             parts: [{ text: msg.content }],
@@ -206,22 +219,12 @@ export default function ChatSessionPage(): React.ReactNode {
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             fullResponse += chunk;
-            setMessages((prev) => {
-              const updated = [...prev];
-              const last = updated.at(-1);
-              if (last) last.content += chunk;
-              return updated;
-            });
+            updateLastMessage((current) => current + chunk);
           }
           const flushChunk = decoder.decode();
           if (flushChunk) {
             fullResponse += flushChunk;
-            setMessages((prev) => {
-              const updated = [...prev];
-              const last = updated.at(-1);
-              if (last) last.content += flushChunk;
-              return updated;
-            });
+            updateLastMessage((current) => current + flushChunk);
           }
           if (ttsEnabled && fullResponse.trim()) {
             speak(fullResponse);
@@ -230,17 +233,12 @@ export default function ChatSessionPage(): React.ReactNode {
         globalThis.dispatchEvent(new Event('refresh-sessions'));
       } catch (err) {
         logger.error({ err }, '채팅 메시지 전송 오류');
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated.at(-1);
-          if (last) last.content = '네트워크 연결 상태를 확인해 주세요.';
-          return updated;
-        });
+        updateLastMessage(() => '네트워크 연결 상태를 확인해 주세요.');
       } finally {
         setIsLoading(false);
       }
     },
-    [apiFetch, isLoading, messages, sessionId, speak, ttsEnabled],
+    [apiFetch, isLoading, messages, sessionId, speak, ttsEnabled, updateLastMessage],
   );
 
   const handleSend = async (e: React.SyntheticEvent) => {
