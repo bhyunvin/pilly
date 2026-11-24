@@ -810,3 +810,519 @@ async fn test_chat_function_calling_with_wiremock_gemini() {
 
     cleanup_test_users(&pool, &user_id, &admin_id).await;
 }
+
+async fn send_authed_empty(
+    app: axum::Router,
+    method: Method,
+    uri: impl AsRef<str>,
+    token: &str,
+) -> axum::response::Response {
+    app.oneshot(
+        Request::builder()
+            .method(method)
+            .uri(uri.as_ref())
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
+async fn send_authed_json(
+    app: axum::Router,
+    method: Method,
+    uri: impl AsRef<str>,
+    token: &str,
+    payload: Value,
+) -> axum::response::Response {
+    app.oneshot(
+        Request::builder()
+            .method(method)
+            .uri(uri.as_ref())
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
+async fn send_authed_multipart(
+    app: axum::Router,
+    uri: impl AsRef<str>,
+    token: &str,
+    boundary: &str,
+    body: String,
+) -> axum::response::Response {
+    app.oneshot(
+        Request::builder()
+            .method(Method::POST)
+            .uri(uri.as_ref())
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .header(
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            )
+            .body(Body::from(body))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
+async fn response_json(res: axum::response::Response) -> Value {
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&body).unwrap()
+}
+
+fn build_inquiry_multipart(
+    boundary: &str,
+    title: &str,
+    content: &str,
+    session_id: Option<i64>,
+    allow_chat_access: bool,
+) -> String {
+    let mut body = format!(
+        "--{boundary}\r\n\
+         Content-Disposition: form-data; name=\"title\"\r\n\r\n{title}\r\n\
+         --{boundary}\r\n\
+         Content-Disposition: form-data; name=\"content\"\r\n\r\n{content}\r\n"
+    );
+    if let Some(sid) = session_id {
+        body.push_str(&format!(
+            "--{boundary}\r\n\
+             Content-Disposition: form-data; name=\"chat_session_id\"\r\n\r\n{sid}\r\n\
+             --{boundary}\r\n\
+             Content-Disposition: form-data; name=\"allow_chat_access\"\r\n\r\n{allow_chat_access}\r\n"
+        ));
+    }
+    body.push_str(&format!("--{boundary}--\r\n"));
+    body
+}
+
+fn build_image_multipart(
+    boundary: &str,
+    filename: &str,
+    content_type: &str,
+    content: &str,
+) -> String {
+    format!(
+        "--{boundary}\r\n\
+         Content-Disposition: form-data; name=\"image\"; filename=\"{filename}\"\r\n\
+         Content-Type: {content_type}\r\n\r\n{content}\r\n\
+         --{boundary}--\r\n"
+    )
+}
+
+#[tokio::test]
+async fn test_withdrawal_restriction_and_profile_conflicts() {
+    let (app, pool, _cfg, user_id, user_token, admin_id, admin_token) = setup_test_app(None).await;
+
+    let admin_nickname: String =
+        sqlx::query_scalar("SELECT nickname FROM user_profiles WHERE user_id = $1")
+            .bind(&admin_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    // 1. 닉네임 중복 시 409 CONFLICT
+    let res = send_authed_json(
+        app.clone(),
+        Method::PATCH,
+        "/api/v1/profile",
+        &user_token,
+        json!({ "nickname": admin_nickname }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CONFLICT);
+
+    // 2. 탈퇴 시 deletion_reason 저장 및 restricted_reason 미오염 검증
+    let res = send_authed_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/profile/withdraw",
+        &user_token,
+        json!({ "reason": "개인 사정으로 탈퇴" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let (del_reason, rest_reason): (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT deletion_reason, restricted_reason FROM user_profiles WHERE user_id = $1",
+    )
+    .bind(&user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(del_reason.as_deref(), Some("개인 사정으로 탈퇴"));
+    assert!(rest_reason.is_none());
+
+    // 3. 복구 후 재복구 시도 시 400 BAD_REQUEST
+    let res = send_authed_empty(
+        app.clone(),
+        Method::POST,
+        "/api/v1/profile/restore",
+        &user_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = send_authed_empty(
+        app.clone(),
+        Method::POST,
+        "/api/v1/profile/restore",
+        &user_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 4. RESTRICTED 유저의 /profile/restore 403 차단 및 /inquiry 이의 제기 201 허용
+    let res = send_authed_json(
+        app.clone(),
+        Method::PATCH,
+        format!("/api/v1/admin/users/{user_id}/status"),
+        &admin_token,
+        json!({ "status": "RESTRICTED", "reason": "운영 정책 위반" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = send_authed_empty(
+        app.clone(),
+        Method::POST,
+        "/api/v1/profile/restore",
+        &user_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    let boundary = "----PillyRestrictedInquiryBoundary";
+    let multipart_body = build_inquiry_multipart(
+        boundary,
+        "이용 제한 이의 제기",
+        "오인 제재 확인 요청드립니다.",
+        None,
+        false,
+    );
+    let res = send_authed_multipart(
+        app.clone(),
+        "/api/v1/inquiry",
+        &user_token,
+        boundary,
+        multipart_body,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = send_authed_empty(app, Method::GET, "/api/v1/inquiry/list", &user_token).await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    cleanup_test_users(&pool, &user_id, &admin_id).await;
+}
+
+#[tokio::test]
+async fn test_pill_detail_session_delete_and_analyze_image_wiremock() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/v1beta/models/.*:generateContent"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "text": "{\"medications\":[{\"name\":\"게보린정\",\"dosage\":\"1정\",\"frequency\":\"하루 3회\"}]}"
+                    }]
+                }
+            }]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let (app, pool, _cfg, user_id, user_token, admin_id, _) =
+        setup_test_app(Some(mock_server.uri())).await;
+
+    let test_seq = format!("TEST-DETAIL-{}", uuid::Uuid::new_v4().simple());
+    sqlx::query(
+        "INSERT INTO pill_catalog (item_seq, item_name, entp_name, drug_shape, color_class1) VALUES ($1, '상세테스트정', '테스트제약', '타원형', '분홍')",
+    )
+    .bind(&test_seq)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 1. 의약품 단건 상세 조회 (존재 200 / 미존재 404)
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/search/pills/{test_seq}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(response_json(res).await["pill"]["itemName"], "상세테스트정");
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/search/pills/NON-EXISTENT-SEQ-999999")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 2. 채팅 세션 삭제 시 연결된 문의 링크 해제 및 승인 정리 검증
+    let res = send_authed_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/chat/sessions",
+        &user_token,
+        json!({ "title": "삭제될 세션" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let session_id = response_json(res).await["data"]["id"].as_i64().unwrap();
+
+    let boundary = "----PillySessionDeleteBoundary";
+    let inquiry_body = build_inquiry_multipart(
+        boundary,
+        "세션 삭제 검증 문의",
+        "세션 삭제 시 연결 해제를 검증합니다.",
+        Some(session_id),
+        true,
+    );
+    let res = send_authed_multipart(
+        app.clone(),
+        "/api/v1/inquiry",
+        &user_token,
+        boundary,
+        inquiry_body,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let inquiry_id = response_json(res).await["inquiryId"].as_i64().unwrap() as i32;
+
+    let res = send_authed_empty(
+        app.clone(),
+        Method::DELETE,
+        format!("/api/v1/chat/sessions/{session_id}"),
+        &user_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = send_authed_empty(
+        app.clone(),
+        Method::GET,
+        format!("/api/v1/chat/sessions/{session_id}"),
+        &user_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    let (linked_session, allow_access): (Option<i32>, Option<bool>) = sqlx::query_as(
+        "SELECT chat_session_id, allow_chat_access FROM user_inquiries WHERE id = $1",
+    )
+    .bind(inquiry_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(linked_session.is_none());
+    assert_eq!(allow_access, Some(false));
+
+    // 3. Vision 이미지 분석 (유효 JPEG 200 / 비허용 MIME 400)
+    let img_boundary = "----PillyVisionBoundary";
+    let res = send_authed_multipart(
+        app.clone(),
+        "/api/v1/medications/analyze-image",
+        &user_token,
+        img_boundary,
+        build_image_multipart(img_boundary, "pill.jpg", "image/jpeg", "FAKEJPEGDATA"),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let json = response_json(res).await;
+    assert_eq!(json["success"], true);
+    assert_eq!(json["data"][0]["name"], "게보린정");
+
+    let res = send_authed_multipart(
+        app,
+        "/api/v1/medications/analyze-image",
+        &user_token,
+        img_boundary,
+        build_image_multipart(img_boundary, "doc.pdf", "application/pdf", "%PDF-1.4"),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    let _ = sqlx::query("DELETE FROM pill_catalog WHERE item_seq = $1")
+        .bind(&test_seq)
+        .execute(&pool)
+        .await;
+    cleanup_test_users(&pool, &user_id, &admin_id).await;
+}
+
+#[tokio::test]
+async fn test_admin_self_guard_inquiries_jit_expiry_atomicity_and_cleanup() {
+    let (app, pool, _cfg, user_id, user_token, admin_id, admin_token) = setup_test_app(None).await;
+
+    // 1. 관리자 셀프 강등 및 셀프 제재 400 차단
+    let res = send_authed_empty(
+        app.clone(),
+        Method::PATCH,
+        format!("/api/v1/admin/users/{admin_id}/role"),
+        &admin_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    let res = send_authed_json(
+        app.clone(),
+        Method::PATCH,
+        format!("/api/v1/admin/users/{admin_id}/status"),
+        &admin_token,
+        json!({ "status": "RESTRICTED" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 2. 관리자 문의 목록/상태 변경 + JIT 최초 열람 원자성 & 24시간 만료 403
+    let res = send_authed_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/chat/sessions",
+        &user_token,
+        json!({ "title": "JIT 만료 테스트 세션" }),
+    )
+    .await;
+    let session_id = response_json(res).await["data"]["id"].as_i64().unwrap();
+
+    let boundary = "----PillyAdminInquiryBoundary";
+    let multipart_body = build_inquiry_multipart(
+        boundary,
+        "관리자 처리용 문의",
+        "확인 요청",
+        Some(session_id),
+        true,
+    );
+    let res = send_authed_multipart(
+        app.clone(),
+        "/api/v1/inquiry",
+        &user_token,
+        boundary,
+        multipart_body,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let inquiry_id = response_json(res).await["inquiryId"].as_i64().unwrap();
+
+    let res = send_authed_empty(
+        app.clone(),
+        Method::GET,
+        "/api/v1/admin/inquiries",
+        &admin_token,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let list_json = response_json(res).await;
+    assert!(
+        list_json["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["id"] == inquiry_id)
+    );
+
+    let res = send_authed_json(
+        app.clone(),
+        Method::PATCH,
+        format!("/api/v1/admin/inquiries/{inquiry_id}/status"),
+        &admin_token,
+        json!({ "status": "RESOLVED" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let approval_uuid: uuid::Uuid = sqlx::query_scalar(
+        "SELECT id FROM chat_access_approvals WHERE chat_session_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(session_id as i32)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // 동시 2요청 실행 후 모두 200 OK 및 accessed_at/expires_at 설정 확인
+    let jit_uri = format!("/api/v1/admin/chat/{approval_uuid}");
+    let (res1, res2) = tokio::join!(
+        send_authed_empty(app.clone(), Method::GET, &jit_uri, &admin_token),
+        send_authed_empty(app.clone(), Method::GET, &jit_uri, &admin_token),
+    );
+    assert_eq!(res1.status(), StatusCode::OK);
+    assert_eq!(res2.status(), StatusCode::OK);
+
+    // 24시간 경과(만료) 시뮬레이션 후 403 FORBIDDEN 검증
+    sqlx::query(
+        "UPDATE chat_access_approvals SET accessed_at = NOW() - INTERVAL '25 hours', expires_at = NOW() - INTERVAL '1 hour' WHERE id = $1",
+    )
+    .bind(approval_uuid)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let res = send_authed_empty(app, Method::GET, &jit_uri, &admin_token).await;
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // 3. cleanup_withdrawn_users 30일 경계값 검증 (29일 전 유지, 31일 전 물리 삭제)
+    let keep_id = format!("test-keep-{}", uuid::Uuid::new_v4());
+    let purge_id = format!("test-purge-{}", uuid::Uuid::new_v4());
+    let keep_nick = format!("유지-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
+    let purge_nick = format!("삭제-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]);
+
+    sqlx::query(
+        "INSERT INTO user_profiles (user_id, nickname, role, status, deleted_at) VALUES ($1, $2, 'USER', 'ACTIVE', NOW() - INTERVAL '29 days')",
+    )
+    .bind(&keep_id)
+    .bind(&keep_nick)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO user_profiles (user_id, nickname, role, status, deleted_at) VALUES ($1, $2, 'USER', 'ACTIVE', NOW() - INTERVAL '31 days')",
+    )
+    .bind(&purge_id)
+    .bind(&purge_nick)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let purged_count = pilly_api::mq::cleanup_withdrawn_users(&pool).await.unwrap();
+    assert!(purged_count >= 1);
+
+    let keep_exists: Option<(String,)> =
+        sqlx::query_as("SELECT user_id FROM user_profiles WHERE user_id = $1")
+            .bind(&keep_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+    let purge_exists: Option<(String,)> =
+        sqlx::query_as("SELECT user_id FROM user_profiles WHERE user_id = $1")
+            .bind(&purge_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+    assert!(keep_exists.is_some());
+    assert!(purge_exists.is_none());
+
+    let _ = sqlx::query("DELETE FROM user_profiles WHERE user_id = $1")
+        .bind(&keep_id)
+        .execute(&pool)
+        .await;
+    cleanup_test_users(&pool, &user_id, &admin_id).await;
+}

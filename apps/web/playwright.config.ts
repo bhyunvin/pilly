@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// 테스트 수행 시 포트 4001 사용을 위해 환경변수 우선 적용
+// 테스트 수행 시 포트 4001(Next.js), 4002(SSR Mock API) 사용
 const PORT = process.env.PORT || '4001';
+const MOCK_API_PORT = process.env.MOCK_API_PORT || '4002';
 
 export default defineConfig({
   testDir: './tests',
@@ -20,15 +21,27 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: `bun run dev --port ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    env: {
-      // 컴포넌트 내 fetch가 3000번이 아닌 테스트 서버 포트를 바라보게 강제함
-      NEXT_PUBLIC_API_URL: `http://localhost:${PORT}`,
+  webServer: [
+    {
+      command: 'node tests/helpers/mockSsrApiServer.mjs',
+      url: `http://127.0.0.1:${MOCK_API_PORT}/health`,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: {
+        MOCK_API_PORT,
+      },
     },
-  },
+    {
+      command: `bun run dev --port ${PORT}`,
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: !process.env.CI,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: {
+        NEXT_PUBLIC_API_URL: `http://127.0.0.1:${MOCK_API_PORT}`,
+        NEXT_PUBLIC_NEON_AUTH_URL: `http://localhost:${PORT}/api/auth`,
+      },
+    },
+  ],
 });

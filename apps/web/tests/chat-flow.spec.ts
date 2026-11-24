@@ -1,89 +1,45 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fulfillJson, MOCK_JWT, setupAuthenticatedSession } from './helpers/mockAuth';
 
 test.describe('Chatting Flow and Session Management', () => {
   test.beforeEach(async ({ page, context }) => {
-    // 1. 미들웨어 통과를 위한 세션 쿠키 삽입
-    await context.addCookies([
-      {
-        name: 'better-auth.session_token',
-        value: 'mock-session-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-      },
-    ]);
-
-    // 2. 세션 모킹
-    await page.route('**/get-session', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          user: { id: 'user_1', email: 'test@example.com' },
-          session: { id: 'session_1', userId: 'user_1' },
-        }),
-      });
-    });
-
-    // 3. 프로필 모킹 (정상 상태)
-    await page.route('**/profile', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: { userId: 'user_1', nickname: '테스터', status: 'ACTIVE', deletedAt: null },
-        }),
-      });
-    });
+    await setupAuthenticatedSession(page, context, { mockSessions: false });
   });
 
-  test('채팅방 생성 및 대화 플로우가 정상 작동하는가?', async ({ page }) => {
-    // 1. Mocking: 채팅 세션 리스트 (처음엔 비어있음)
-    await page.route('**/chat/sessions', async (route) => {
+  test('채팅방 생성 및 신규 세션 첫 질문이 JWT 인증과 함께 정상 응답되는가?', async ({ page }) => {
+    await page.route('**/api/v1/chat/sessions', async (route) => {
       const method = route.request().method();
       if (method === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify([]),
-        });
+        await fulfillJson(route, []);
       } else if (method === 'POST') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: true,
-            data: { id: 123, title: '새로운 상담', createdAt: new Date().toISOString() },
-          }),
+        await fulfillJson(route, {
+          success: true,
+          data: { id: 123, title: '새로운 상담', createdAt: new Date().toISOString() },
         });
       }
     });
 
-    // 2. 채팅 페이지 접속
     await page.goto('/chat');
 
-    // 3. 상담 시작 유도 버튼 확인 (aria-label 사용)
     const startButton = page.getByLabel('새로운 상담 시작하기');
     await expect(startButton).toBeVisible();
     await startButton.click();
 
-    // 4. 채팅 세션 페이지로 리다이렉트 (Mocking 적용 전 대기)
     await page.waitForURL(/\/chat\/\d+/);
 
-    // 채팅 세션 내역 조회 모킹 (초기 로드 404 방지)
     await page.route('**/api/v1/chat/sessions/123', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, logs: [] }),
-      });
+      await fulfillJson(route, { success: true, logs: [] });
     });
 
-    // 메시지 전송 API 모킹
-    await page.route('**/chat/sessions/*/message', async (route) => {
+    let capturedAuthHeader = '';
+    let capturedHistory: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    await page.route('**/api/v1/chat/sessions/*/message', async (route) => {
+      capturedAuthHeader = route.request().headers().authorization ?? '';
+      const payload = route.request().postDataJSON() as {
+        history: Array<{ role: string; parts: Array<{ text: string }> }>;
+      };
+      capturedHistory = payload.history;
+
       await route.fulfill({
         status: 200,
         contentType: 'text/plain; charset=utf-8',
@@ -91,14 +47,16 @@ test.describe('Chatting Flow and Session Management', () => {
       });
     });
 
-    // 5. 메시지 전송 시뮬레이션
     const input = page.getByLabel('채팅 입력');
     await expect(input).toBeVisible();
     await input.fill('감기약 성분이 궁금해요.');
     await page.keyboard.press('Enter');
 
-    // 6. 스트리밍된 AI 최종 답변 렌더링 확인
     await expect(page.locator('text=감기약 성분이 궁금해요.')).toBeVisible();
     await expect(page.locator('text=AI 답변입니다.')).toBeVisible();
+
+    expect(capturedAuthHeader).toBe(`Bearer ${MOCK_JWT}`);
+    expect(capturedHistory[0]?.role).toBe('user');
+    expect(capturedHistory[0]?.parts[0]?.text).toBe('감기약 성분이 궁금해요.');
   });
 });

@@ -1,54 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fulfillJson, setupAuthenticatedSession } from './helpers/mockAuth';
 
 test.describe('의약품 검색 및 필터링 흐름', () => {
   test.beforeEach(async ({ page, context }) => {
-    await context.addCookies([
-      {
-        name: 'better-auth.session_token',
-        value: 'mock-session-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-      },
-    ]);
-
-    await page.route('**/get-session', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          user: { id: 'user_1', email: 'test@example.com' },
-          session: { id: 'session_1', userId: 'user_1' },
-        }),
-      });
-    });
-
-    await page.route('**/profile', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            userId: 'user_1',
-            nickname: '테스터',
-            role: 'USER',
-            status: 'ACTIVE',
-            deletedAt: null,
-          },
-        }),
-      });
-    });
-
-    await page.route('**/chat/sessions', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      });
-    });
+    await setupAuthenticatedSession(page, context);
   });
 
   test('검색어 입력 및 필터 선택 시 의약품 검색 API 호출과 결과 렌더링이 정상 동작한다', async ({
@@ -77,14 +32,7 @@ test.describe('의약품 검색 및 필터링 흐름', () => {
             },
           ];
 
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          pills,
-        }),
-      });
+      await fulfillJson(route, { success: true, pills });
     });
 
     await page.goto('/search');
@@ -103,7 +51,6 @@ test.describe('의약품 검색 및 필터링 흐름', () => {
       true,
     );
 
-    // 없는 약 검색 시 빈 결과 안내 메시지 검증
     await searchInput.fill('존재하지않는약');
     await page.getByRole('button', { name: '검색' }).click();
     await expect(

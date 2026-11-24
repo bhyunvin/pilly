@@ -307,20 +307,32 @@ mod tests {
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
     }
 
+    fn make_hs256_jwk(kid: &str, secret: &[u8]) -> Jwk {
+        serde_json::from_value(serde_json::json!({
+            "kty": "oct",
+            "kid": kid,
+            "alg": "HS256",
+            "k": base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, secret)
+        }))
+        .unwrap()
+    }
+
+    fn assert_forbidden(res: Result<(), AppError>) {
+        assert_eq!(
+            res.unwrap_err().into_response().status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+
     #[tokio::test]
     async fn test_auth_user_rejects_expired_forged_and_alg_mismatched_jwt_with_jwk() {
         let state = make_test_state().await;
 
         // HS256 테스트용 JWK 등록
         let secret = b"super-secret-test-key-for-hs256-32b";
-        let jwk: Jwk = serde_json::from_value(serde_json::json!({
-            "kty": "oct",
-            "kid": "test-kid",
-            "alg": "HS256",
-            "k": base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, secret)
-        }))
-        .unwrap();
-        state.jwks_cache.insert("test-kid".to_string(), jwk);
+        state
+            .jwks_cache
+            .insert("test-kid".to_string(), make_hs256_jwk("test-kid", secret));
 
         // 만료된 토큰
         let mut header = Header::new(Algorithm::HS256);
@@ -388,6 +400,117 @@ mod tests {
         let err = AuthUser::from_request_parts(&mut parts, &state)
             .await
             .unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_enforce_account_status_policy_transitions() {
+        let deleted = Some(chrono::Utc::now());
+
+        // 1. 탈퇴 유예 계정은 /profile 조회와 /profile/restore만 허용
+        assert!(
+            enforce_account_status_policy(&Method::GET, "/api/v1/profile", "ACTIVE", deleted)
+                .is_ok()
+        );
+        assert!(
+            enforce_account_status_policy(
+                &Method::POST,
+                "/api/v1/profile/restore",
+                "ACTIVE",
+                deleted
+            )
+            .is_ok()
+        );
+        assert_forbidden(enforce_account_status_policy(
+            &Method::GET,
+            "/api/v1/medications",
+            "ACTIVE",
+            deleted,
+        ));
+        assert_forbidden(enforce_account_status_policy(
+            &Method::POST,
+            "/api/v1/inquiry",
+            "ACTIVE",
+            deleted,
+        ));
+
+        // 2. 이용 제한 계정은 /profile 조회 및 /inquiry(등록/목록)만 허용하고 /profile/restore 차단
+        assert!(
+            enforce_account_status_policy(&Method::GET, "/api/v1/profile", "RESTRICTED", None)
+                .is_ok()
+        );
+        assert!(
+            enforce_account_status_policy(&Method::POST, "/api/v1/inquiry", "RESTRICTED", None)
+                .is_ok()
+        );
+        assert!(
+            enforce_account_status_policy(&Method::GET, "/api/v1/inquiry/list", "RESTRICTED", None)
+                .is_ok()
+        );
+        assert_forbidden(enforce_account_status_policy(
+            &Method::POST,
+            "/api/v1/profile/restore",
+            "RESTRICTED",
+            None,
+        ));
+        assert_forbidden(enforce_account_status_policy(
+            &Method::GET,
+            "/api/v1/medications",
+            "RESTRICTED",
+            None,
+        ));
+
+        // 3. 정상 계정은 일반 경로 허용
+        assert!(
+            enforce_account_status_policy(&Method::GET, "/api/v1/medications", "ACTIVE", None)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_verify_jwt_claims_validates_issuer_and_audience() {
+        #[derive(Serialize)]
+        struct ScopedClaims {
+            sub: String,
+            email: String,
+            exp: usize,
+            iss: String,
+            aud: String,
+        }
+
+        let secret = b"super-secret-test-key-for-hs256-32b";
+        let jwk = make_hs256_jwk("scoped-kid", secret);
+
+        let mut header = Header::new(Algorithm::HS256);
+        header.kid = Some("scoped-kid".to_string());
+
+        let mut config = Config::from_env();
+        config.neon_auth_issuer = "https://auth.pilly.test".to_string();
+        config.neon_auth_audience = "pilly-api".to_string();
+
+        let valid_claims = ScopedClaims {
+            sub: "user-1".to_string(),
+            email: "user@test.com".to_string(),
+            exp: (chrono::Utc::now().timestamp() + 3600) as usize,
+            iss: "https://auth.pilly.test".to_string(),
+            aud: "pilly-api".to_string(),
+        };
+        let valid_token =
+            encode(&header, &valid_claims, &EncodingKey::from_secret(secret)).unwrap();
+        let verified = verify_jwt_claims(&valid_token, &header, &jwk, &config).expect("유효 토큰");
+        assert_eq!(verified.sub, "user-1");
+
+        let wrong_aud_claims = ScopedClaims {
+            aud: "other-service".to_string(),
+            ..valid_claims
+        };
+        let wrong_aud_token = encode(
+            &header,
+            &wrong_aud_claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+        let err = verify_jwt_claims(&wrong_aud_token, &header, &jwk, &config).unwrap_err();
         assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
     }
 }

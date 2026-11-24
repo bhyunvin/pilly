@@ -623,29 +623,32 @@ mod tests {
             "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"타이레놀은 하루 최대 4000mg까지만 복용하세요.\"}]}}]}\n\n",
             "data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"getMyMedications\",\"args\":{\"filter\":\"all\"}}}]}}]}\n\n"
         );
-        // 3바이트씩 강제 분할하여 멀티바이트 한글 및 JSON 경계 분할 시뮬레이션
-        let chunks: Vec<Result<bytes::Bytes, std::io::Error>> = sse_payload
-            .as_bytes()
-            .chunks(3)
-            .map(|c| Ok(bytes::Bytes::copy_from_slice(c)))
-            .collect();
 
-        let (tx, mut rx) = mpsc::channel(16);
-        let mut full_text = String::new();
-        let fc =
-            consume_gemini_sse_stream(futures::stream::iter(chunks), &tx, &mut full_text).await;
-        drop(tx);
+        // 3~5바이트씩 강제 분할하여 멀티바이트 한글 및 JSON 경계 분할 시뮬레이션
+        for chunk_size in [3, 5] {
+            let chunks: Vec<Result<bytes::Bytes, std::io::Error>> = sse_payload
+                .as_bytes()
+                .chunks(chunk_size)
+                .map(|c| Ok(bytes::Bytes::copy_from_slice(c)))
+                .collect();
 
-        let mut streamed = String::new();
-        while let Some(Ok(b)) = rx.recv().await {
-            streamed.push_str(&String::from_utf8_lossy(&b));
+            let (tx, mut rx) = mpsc::channel(16);
+            let mut full_text = String::new();
+            let fc =
+                consume_gemini_sse_stream(futures::stream::iter(chunks), &tx, &mut full_text).await;
+            drop(tx);
+
+            let mut streamed = String::new();
+            while let Some(Ok(b)) = rx.recv().await {
+                streamed.push_str(&String::from_utf8_lossy(&b));
+            }
+
+            assert_eq!(full_text, "타이레놀은 하루 최대 4000mg까지만 복용하세요.");
+            assert_eq!(streamed, full_text);
+            let (fn_name, fn_args) = fc.expect("functionCall 파싱 성공");
+            assert_eq!(fn_name, "getMyMedications");
+            assert_eq!(fn_args["filter"], "all");
         }
-
-        assert_eq!(full_text, "타이레놀은 하루 최대 4000mg까지만 복용하세요.");
-        assert_eq!(streamed, full_text);
-        let (fn_name, fn_args) = fc.expect("functionCall 파싱 성공");
-        assert_eq!(fn_name, "getMyMedications");
-        assert_eq!(fn_args["filter"], "all");
     }
 
     #[test]
@@ -663,12 +666,26 @@ mod tests {
                     text: "아스피린 주의사항 알려줘".to_string(),
                 }],
             },
+            ChatHistoryItem {
+                role: "model".to_string(),
+                parts: vec![ChatHistoryPart {
+                    text: "위장장애에 주의하세요.".to_string(),
+                }],
+            },
+            ChatHistoryItem {
+                role: "user".to_string(),
+                parts: vec![ChatHistoryPart {
+                    text: "식후에 먹어야 하나요?".to_string(),
+                }],
+            },
         ];
 
         let (prompt, contents) = build_gemini_contents(&history).expect("유효한 히스토리");
-        assert_eq!(prompt, "아스피린 주의사항 알려줘");
-        assert_eq!(contents.len(), 1);
+        assert_eq!(prompt, "식후에 먹어야 하나요?");
+        assert_eq!(contents.len(), 3);
         assert_eq!(contents[0]["role"], "user");
+        assert_eq!(contents[1]["role"], "model");
+        assert_eq!(contents[2]["role"], "user");
 
         let only_model = vec![ChatHistoryItem {
             role: "model".to_string(),
