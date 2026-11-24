@@ -5,12 +5,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock* ./
+COPY migrations ./migrations
 COPY src ./src
 
 RUN cargo build --release --bin pilly-api --bin sync_pills
 
-# Iggy Server Binary Stage
-FROM iggyrs/iggy:0.4.214 AS iggy
+# Iggy Server Binary Stage (iggy = "0.12" Rust SDK 프로토콜 호환 버전)
+FROM apache/iggy:0.10.0 AS iggy
 
 # Runtime Stage
 FROM debian:bookworm-slim

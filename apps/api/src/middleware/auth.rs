@@ -83,7 +83,7 @@ impl FromRequestParts<AppState> for AuthUser {
         let user_id = token_data.claims.sub;
         let email = token_data.claims.email;
 
-        // 사용자 프로필 상태 확인
+        // 사용자 프로필 상태 확인 (기존 DB TIMESTAMP WITHOUT TIME ZONE 호환을 위해 NaiveDateTime으로 조회)
         let row: Option<(String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
             "SELECT status, deleted_at FROM user_profiles WHERE user_id = $1 LIMIT 1",
         )

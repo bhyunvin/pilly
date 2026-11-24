@@ -37,6 +37,7 @@ struct MedicationHistoryItem {
     id: i32,
     medication_id: Option<i32>,
     status: Option<String>,
+    #[serde(with = "crate::db::opt_utc_naive_datetime")]
     taken_at: Option<chrono::NaiveDateTime>,
 }
 

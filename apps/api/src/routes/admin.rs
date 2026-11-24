@@ -30,6 +30,7 @@ struct AdminUserSummary {
     nickname: String,
     role: String,
     status: String,
+    #[serde(with = "crate::db::opt_utc_naive_datetime")]
     created_at: Option<chrono::NaiveDateTime>,
 }
 

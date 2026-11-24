@@ -1,10 +1,14 @@
 use std::env;
 
+const DEFAULT_CORS_ALLOWED_ORIGINS: [&str; 2] = ["http://localhost:3000", "http://localhost:4001"];
+
 /// 애플리케이션 전역 설정 구조체
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
     pub database_url: String,
+    pub run_migrations: bool,
+    pub cors_allowed_origins: Vec<String>,
     pub iggy_address: String,
     pub iggy_username: String,
     pub iggy_password: String,
@@ -13,6 +17,7 @@ pub struct Config {
     pub admin_api_key: String,
     pub gemini_api_key: String,
     pub gemini_base_url: String,
+    pub gemini_model: String,
     pub data_go_kr_api_key: String,
     pub data_go_kr_endpoint: String,
     pub cloudinary_cloud_name: String,
@@ -42,9 +47,15 @@ impl Config {
             format!("postgresql://{user}:{password}@{host}:{port}/{name}")
         });
 
+        let run_migrations = crate::db::should_run_migrations();
+        let cors_allowed_origins =
+            parse_cors_allowed_origins(env::var("CORS_ALLOWED_ORIGINS").ok().as_deref());
+
         Self {
             port,
             database_url,
+            run_migrations,
+            cors_allowed_origins,
             iggy_address: env::var("IGGY_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8090".to_string()),
             iggy_username: env::var("IGGY_USERNAME").unwrap_or_else(|_| "iggy".to_string()),
             iggy_password: env::var("IGGY_PASSWORD").unwrap_or_else(|_| "iggy".to_string()),
@@ -54,6 +65,8 @@ impl Config {
             gemini_api_key: env::var("GOOGLE_GENERATIVE_AI_API_KEY").unwrap_or_default(),
             gemini_base_url: env::var("GEMINI_BASE_URL")
                 .unwrap_or_else(|_| "https://generativelanguage.googleapis.com".to_string()),
+            gemini_model: env::var("GEMINI_MODEL")
+                .unwrap_or_else(|_| "gemini-3.8-flash".to_string()),
             data_go_kr_api_key: env::var("DATA_GO_KR_API_KEY").unwrap_or_default(),
             data_go_kr_endpoint: env::var("DATA_GO_KR_ENDPOINT").unwrap_or_else(|_| {
                 "https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03".to_string()
@@ -70,5 +83,24 @@ impl Config {
             smtp_password: env::var("SMTP_PASSWORD").unwrap_or_default(),
             smtp_from: env::var("SMTP_FROM").unwrap_or_else(|_| "noreply@pilly.app".to_string()),
         }
+    }
+}
+
+fn parse_cors_allowed_origins(raw: Option<&str>) -> Vec<String> {
+    let origins: Vec<String> = raw
+        .into_iter()
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToString::to_string)
+        .collect();
+
+    if origins.is_empty() {
+        DEFAULT_CORS_ALLOWED_ORIGINS
+            .iter()
+            .map(|origin| (*origin).to_string())
+            .collect()
+    } else {
+        origins
     }
 }

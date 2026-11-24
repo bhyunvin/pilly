@@ -17,8 +17,8 @@
     "update:deps": "bun update && (cd apps/api && cargo update)",
     "audit": "bun audit --omit=dev && (cd apps/api && cargo audit)",
     "typecheck": "turbo run typecheck",
-    "test:api": "cd apps/api && bun test --parallel",
-    "test:web": "cd apps/web && bun test --parallel",
+    "test:api": "cd apps/api && cargo test",
+    "test:web": "cd apps/web && bun run test",
     "test:changed": "turbo run test -- --changed",
     "test": "turbo run test"
   },
