@@ -27,17 +27,23 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// 의약품 검색 캐시 기본 인스턴스를 생성합니다. (동기화 무효화 연동을 위해 외부 공유 가능)
+    pub fn build_pill_cache() -> Cache<String, Vec<PillCatalog>> {
+        Cache::builder()
+            .max_capacity(10_000)
+            .time_to_live(Duration::from_secs(600))
+            .build()
+    }
+
     /// 운영 서버와 테스트가 공통으로 사용하는 기본 상태를 생성합니다.
     pub fn new(pool: PgPool, config: Config, producer: EventProducer) -> Self {
+        let pill_cache = producer.pill_cache().unwrap_or_else(Self::build_pill_cache);
         Self {
             pool,
             config,
             producer,
             http_client: reqwest::Client::new(),
-            pill_cache: Cache::builder()
-                .max_capacity(10_000)
-                .time_to_live(Duration::from_secs(600))
-                .build(),
+            pill_cache,
             jwks_cache: Arc::new(DashMap::new()),
             jwks_refresh_lock: Arc::new(Mutex::new(None)),
         }
