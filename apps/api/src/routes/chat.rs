@@ -186,7 +186,7 @@ async fn send_message(
         .map(|p| p.text.clone())
         .unwrap_or_default();
 
-    let encrypted_prompt = encrypt(&user_prompt, &state.config.encryption_key);
+    let encrypted_prompt = encrypt(&user_prompt, &state.config.encryption_key)?;
 
     let log_record: AiChatLog = sqlx::query_as(
         "INSERT INTO ai_chat_logs (session_id, user_id, prompt, response) VALUES ($1, $2, $3, '') RETURNING id, session_id, user_id, prompt, response, created_at",
@@ -325,14 +325,22 @@ async fn send_message(
             }
         }
 
-        let encrypted_response = encrypt(&full_text, &enc_key);
-        if let Err(err) = sqlx::query("UPDATE ai_chat_logs SET response = $1 WHERE id = $2")
-            .bind(&encrypted_response)
-            .bind(log_id)
-            .execute(&pool)
-            .await
-        {
-            tracing::error!("AI 응답 암호화 저장 실패: {:?}", err);
+        match encrypt(&full_text, &enc_key) {
+            Ok(encrypted_response) => {
+                if let Err(err) = sqlx::query("UPDATE ai_chat_logs SET response = $1 WHERE id = $2")
+                    .bind(&encrypted_response)
+                    .bind(log_id)
+                    .execute(&pool)
+                    .await
+                {
+                    tracing::error!("AI 응답 암호화 저장 실패: {:?}", err);
+                }
+            }
+            Err(err) => {
+                tracing::error!(
+                    "AI 응답 암호화 실패로 평문 저장을 중단합니다 (log_id={log_id}): {err}"
+                );
+            }
         }
     });
 

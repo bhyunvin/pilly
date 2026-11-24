@@ -11,10 +11,37 @@ import { Footer } from './Footer';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 
+const PUBLIC_SKIP_PATHS = new Set(['/login', '/terms', '/privacy']);
+
+interface GuardProfile {
+  deletedAt?: string | null;
+  status?: string;
+  role?: string;
+}
+
+/**
+ * 사용자의 프로필 상태 및 권한에 따라 리다이렉트할 대상 경로를 결정합니다.
+ */
+function resolveProfileRedirect(pathname: string, profile: GuardProfile): string | null {
+  if (profile.deletedAt) {
+    return pathname !== '/restore' ? '/restore' : null;
+  }
+
+  if (profile.status === 'RESTRICTED') {
+    return pathname !== '/restricted' && pathname !== '/inquiry' ? '/restricted' : null;
+  }
+
+  if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
+    return '/';
+  }
+
+  return null;
+}
+
 /**
  * @description 애플리케이션의 공통 레이아웃을 정의하는 셸 컴포넌트입니다.
  * 사이드바, 헤더, 푸터, 하단 내비게이션 등 전역 UI 구조를 포함하며,
- * 마운트 시 사용자 세션 상태를 확인하여 서비스 이용 제한(제재, 탈퇴 유예) 여부를 체크하고 리다이렉션을 수행합니다.
+ * 로그인 사용자의 프로필 상태(미설정, 탈퇴 유예, 이용 제한, 관리자 권한)에 따라 적절한 경로로 가드합니다.
  *
  * @param props - 레이아웃 내부에 렌더링될 콘텐츠
  * @returns 공통 UI 요소가 적용된 전체 레이아웃 구조를 반환합니다.
@@ -25,15 +52,8 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const { apiFetch } = useApi();
 
   useEffect(() => {
-    const checkRestriction = async () => {
-      // 이미 제한 페이지거나 복구 페이지, 공개 페이지(로그인 등)인 경우 체크 건너뜀
-      if (
-        pathname === '/restricted' ||
-        pathname === '/restore' ||
-        pathname === '/login' ||
-        pathname === '/terms' ||
-        pathname === '/privacy'
-      ) {
+    const checkAccessGuard = async () => {
+      if (PUBLIC_SKIP_PATHS.has(pathname)) {
         return;
       }
 
@@ -43,27 +63,28 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
         const response = await apiFetch('/profile');
 
+        if (response.status === 404) {
+          if (pathname !== '/profile/setup') {
+            router.replace('/profile/setup');
+          }
+          return;
+        }
+
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
-            // 1. 탈퇴 유예 상태 체크 (최우선)
-            if (result.data.deletedAt) {
-              router.replace('/restore');
-              return;
-            }
-            // 2. 관리자 제재 상태 체크
-            if (result.data.status === 'RESTRICTED') {
-              router.replace('/restricted');
-              return;
+            const redirectTo = resolveProfileRedirect(pathname, result.data as GuardProfile);
+            if (redirectTo) {
+              router.replace(redirectTo);
             }
           }
         }
       } catch (err) {
-        logger.error({ err }, 'Restriction/Withdrawal check failed');
+        logger.error({ err }, '계정 상태 및 권한 가드 확인 실패');
       }
     };
 
-    void checkRestriction();
+    void checkAccessGuard();
   }, [pathname, router, apiFetch]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';

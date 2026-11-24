@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useApi } from '@/hooks/useApi';
+import { clearAuthTokenCache, useApi } from '@/hooks/useApi';
 import { authClient } from '@/lib/auth';
 import { logger } from '@/utils/logger';
 
@@ -43,6 +43,7 @@ export default function ProfilePage(): React.ReactNode {
   const [withdrawalReason, setWithdrawalReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
@@ -110,6 +111,26 @@ export default function ProfilePage(): React.ReactNode {
       setMessage({ text: '오류가 발생했습니다.', type: 'error' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  /**
+   * 현재 세션을 종료하고 로그인 페이지로 이동합니다.
+   *
+   * @async
+   */
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      clearAuthTokenCache();
+      await authClient.signOut();
+      router.replace('/login');
+    } catch (err) {
+      logger.error({ err }, 'Logout error');
+      alert('로그아웃 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -186,9 +207,19 @@ export default function ProfilePage(): React.ReactNode {
               </p>
             )}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex items-center justify-between gap-2">
             <Button type="submit" disabled={isSaving}>
               {isSaving ? '저장 중...' : '닉네임 수정'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              aria-label="로그아웃"
+            >
+              <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
+              {isLoggingOut ? '로그아웃 중...' : '로그아웃'}
             </Button>
           </CardFooter>
         </form>

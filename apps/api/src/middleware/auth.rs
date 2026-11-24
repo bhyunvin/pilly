@@ -1,11 +1,19 @@
+use std::time::{Duration, Instant};
+
 use axum::{
     extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts},
+    http::{Method, header::AUTHORIZATION, request::Parts},
 };
-use jsonwebtoken::{DecodingKey, Validation, decode, decode_header, jwk::JwkSet};
+use jsonwebtoken::{
+    Algorithm, DecodingKey, Header, Validation, decode, decode_header,
+    jwk::{Jwk, JwkSet, KeyAlgorithm},
+};
 use serde::Deserialize;
 
-use crate::{error::AppError, state::AppState};
+use crate::{config::Config, error::AppError, state::AppState};
+
+const JWKS_REFRESH_COOLDOWN: Duration = Duration::from_secs(30);
+const JWKS_FETCH_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Deserialize)]
 struct Claims {
@@ -20,6 +28,139 @@ pub struct AuthUser {
     pub user_id: String,
     #[allow(dead_code)]
     pub email: String,
+    pub role: Option<String>,
+}
+
+fn map_jwk_algorithm(alg: KeyAlgorithm) -> Option<Algorithm> {
+    match alg {
+        KeyAlgorithm::HS256 => Some(Algorithm::HS256),
+        KeyAlgorithm::HS384 => Some(Algorithm::HS384),
+        KeyAlgorithm::HS512 => Some(Algorithm::HS512),
+        KeyAlgorithm::ES256 => Some(Algorithm::ES256),
+        KeyAlgorithm::ES384 => Some(Algorithm::ES384),
+        KeyAlgorithm::RS256 => Some(Algorithm::RS256),
+        KeyAlgorithm::RS384 => Some(Algorithm::RS384),
+        KeyAlgorithm::RS512 => Some(Algorithm::RS512),
+        KeyAlgorithm::PS256 => Some(Algorithm::PS256),
+        KeyAlgorithm::PS384 => Some(Algorithm::PS384),
+        KeyAlgorithm::PS512 => Some(Algorithm::PS512),
+        KeyAlgorithm::EdDSA => Some(Algorithm::EdDSA),
+        _ => None,
+    }
+}
+
+/// JWKS 캐시 미스 시 Singleflight 락 + 30초 쿨다운 + 5초 타임아웃으로 원격 JWKS를 안전하게 갱신합니다.
+async fn refresh_jwks_if_needed(state: &AppState, kid: &str) -> Result<(), AppError> {
+    if state.jwks_cache.contains_key(kid) || state.config.neon_auth_jwks_url.is_empty() {
+        return Ok(());
+    }
+
+    let mut last_refresh = state.jwks_refresh_lock.lock().await;
+    if state.jwks_cache.contains_key(kid) {
+        return Ok(());
+    }
+
+    if let Some(prev) = *last_refresh
+        && prev.elapsed() < JWKS_REFRESH_COOLDOWN
+    {
+        return Err(AppError::Unauthorized(
+            "Unauthorized: Key not found".to_string(),
+        ));
+    }
+
+    // 성공/실패 여부와 무관하게 재조회 시각을 기록하여 미등록 kid 폭주(DoS)를 차단한다.
+    *last_refresh = Some(Instant::now());
+
+    let response = state
+        .http_client
+        .get(&state.config.neon_auth_jwks_url)
+        .timeout(JWKS_FETCH_TIMEOUT)
+        .send()
+        .await
+        .map_err(|_| AppError::Unauthorized("Unauthorized: JWKS fetch failed".to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Unauthorized(
+            "Unauthorized: JWKS fetch failed".to_string(),
+        ));
+    }
+
+    let jwks: JwkSet = response
+        .json()
+        .await
+        .map_err(|_| AppError::Unauthorized("Unauthorized: JWKS parse failed".to_string()))?;
+
+    for jwk in jwks.keys {
+        if let Some(id) = jwk.common.key_id.clone() {
+            state.jwks_cache.insert(id, jwk);
+        }
+    }
+
+    Ok(())
+}
+
+/// JWK 알고리즘 교차 검증과 `iss`/`aud` 검증을 포함해 JWT 클레임을 디코딩합니다.
+fn verify_jwt_claims(
+    token: &str,
+    header: &Header,
+    jwk: &Jwk,
+    config: &Config,
+) -> Result<Claims, AppError> {
+    if let Some(jwk_alg) = jwk.common.key_algorithm {
+        let expected_alg = map_jwk_algorithm(jwk_alg)
+            .ok_or_else(|| AppError::Unauthorized("Unauthorized: Invalid JWK".to_string()))?;
+        if expected_alg != header.alg {
+            return Err(AppError::Unauthorized(
+                "Unauthorized: Token algorithm mismatch".to_string(),
+            ));
+        }
+    }
+
+    let decoding_key = DecodingKey::from_jwk(jwk)
+        .map_err(|_| AppError::Unauthorized("Unauthorized: Invalid JWK".to_string()))?;
+
+    let mut validation = Validation::new(header.alg);
+    if config.neon_auth_audience.is_empty() {
+        validation.validate_aud = false;
+    } else {
+        validation.set_audience(&[&config.neon_auth_audience]);
+        validation.validate_aud = true;
+    }
+    if !config.neon_auth_issuer.is_empty() {
+        validation.set_issuer(&[&config.neon_auth_issuer]);
+    }
+
+    decode::<Claims>(token, &decoding_key, &validation)
+        .map(|data| data.claims)
+        .map_err(|_| AppError::Unauthorized("Unauthorized: Invalid token".to_string()))
+}
+
+/// 탈퇴 유예(`deleted_at`) 및 이용 제한(`RESTRICTED`) 계정의 허용 경로 정책을 검증합니다.
+fn enforce_account_status_policy(
+    method: &Method,
+    original_path: &str,
+    status: &str,
+    deleted_at: Option<chrono::NaiveDateTime>,
+) -> Result<(), AppError> {
+    let normalized_path = original_path.trim_end_matches('/');
+    let is_profile_read = *method == Method::GET && normalized_path.ends_with("/profile");
+    let is_restore_path = *method == Method::POST && normalized_path.ends_with("/profile/restore");
+    let is_inquiry_path = (*method == Method::POST && normalized_path.ends_with("/inquiry"))
+        || (*method == Method::GET && normalized_path.ends_with("/inquiry/list"));
+
+    if deleted_at.is_some() {
+        if !is_profile_read && !is_restore_path {
+            return Err(AppError::Forbidden(
+                "탈퇴 유예 중인 계정입니다. 계정 복구 후 이용해 주세요.".to_string(),
+            ));
+        }
+    } else if status == "RESTRICTED" && !is_profile_read && !is_inquiry_path {
+        return Err(AppError::Forbidden(
+            "운영 정책에 따라 계정 이용이 제한되었습니다.".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 impl FromRequestParts<AppState> for AuthUser {
@@ -43,49 +184,21 @@ impl FromRequestParts<AppState> for AuthUser {
             AppError::Unauthorized("Unauthorized: Invalid token header".to_string())
         })?;
 
-        let kid = header.kid.unwrap_or_default();
-
-        // JWKS 캐시 조회 또는 원격 fetch
-        if !state.jwks_cache.contains_key(&kid) && !state.config.neon_auth_jwks_url.is_empty() {
-            let jwks: JwkSet = state
-                .http_client
-                .get(&state.config.neon_auth_jwks_url)
-                .send()
-                .await
-                .map_err(|_| AppError::Unauthorized("Unauthorized: JWKS fetch failed".to_string()))?
-                .json()
-                .await
-                .map_err(|_| {
-                    AppError::Unauthorized("Unauthorized: JWKS parse failed".to_string())
-                })?;
-
-            for jwk in jwks.keys {
-                if let Some(id) = jwk.common.key_id.clone() {
-                    state.jwks_cache.insert(id, jwk);
-                }
-            }
-        }
+        let kid = header.kid.as_deref().unwrap_or_default();
+        refresh_jwks_if_needed(state, kid).await?;
 
         let jwk = state
             .jwks_cache
-            .get(&kid)
+            .get(kid)
             .ok_or_else(|| AppError::Unauthorized("Unauthorized: Key not found".to_string()))?;
 
-        let decoding_key = DecodingKey::from_jwk(&jwk)
-            .map_err(|_| AppError::Unauthorized("Unauthorized: Invalid JWK".to_string()))?;
+        let claims = verify_jwt_claims(token, &header, &jwk, &state.config)?;
+        let user_id = claims.sub;
+        let email = claims.email;
 
-        let mut validation = Validation::new(header.alg);
-        validation.validate_aud = false;
-
-        let token_data = decode::<Claims>(token, &decoding_key, &validation)
-            .map_err(|_| AppError::Unauthorized("Unauthorized: Invalid token".to_string()))?;
-
-        let user_id = token_data.claims.sub;
-        let email = token_data.claims.email;
-
-        // 사용자 프로필 상태 확인 (기존 DB TIMESTAMP WITHOUT TIME ZONE 호환을 위해 NaiveDateTime으로 조회)
-        let row: Option<(String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
-            "SELECT status, deleted_at FROM user_profiles WHERE user_id = $1 LIMIT 1",
+        // 사용자 역할 및 계정 상태를 단일 쿼리로 조회 (기존 DB TIMESTAMP WITHOUT TIME ZONE 호환을 위해 NaiveDateTime 사용)
+        let row: Option<(String, String, Option<chrono::NaiveDateTime>)> = sqlx::query_as(
+            "SELECT role, status, deleted_at FROM user_profiles WHERE user_id = $1 LIMIT 1",
         )
         .bind(&user_id)
         .fetch_optional(&state.pool)
@@ -96,31 +209,22 @@ impl FromRequestParts<AppState> for AuthUser {
             .extensions
             .get::<axum::extract::OriginalUri>()
             .map_or_else(|| parts.uri.path().to_string(), |u| u.0.path().to_string());
-        let is_restore_path = original_path.ends_with("/profile/restore");
-        // 제한/탈퇴 유예 사용자도 자신의 상태 확인을 위해 프로필 조회(GET)는 허용한다.
-        let is_profile_read =
-            parts.method == axum::http::Method::GET && original_path.ends_with("/profile");
-        if let Some((status, deleted_at)) = row
-            && !is_restore_path
-            && !is_profile_read
-        {
-            if status == "RESTRICTED" {
-                return Err(AppError::Forbidden(
-                    "Forbidden: Your account has been restricted.".to_string(),
-                ));
-            }
-            if deleted_at.is_some() {
-                return Err(AppError::Forbidden(
-                    "Forbidden: Your account is scheduled for deletion.".to_string(),
-                ));
-            }
+
+        let mut role = None;
+        if let Some((user_role, status, deleted_at)) = row {
+            role = Some(user_role);
+            enforce_account_status_policy(&parts.method, &original_path, &status, deleted_at)?;
         }
 
-        Ok(AuthUser { user_id, email })
+        Ok(AuthUser {
+            user_id,
+            email,
+            role,
+        })
     }
 }
 
-/// 관리자 권한 검증 추출기
+/// 관리자 권한 검증 추출기 (`AuthUser`에서 이미 조회한 `role`을 재사용)
 #[derive(Debug, Clone)]
 pub struct AdminUser {
     pub user_id: String,
@@ -135,19 +239,14 @@ impl FromRequestParts<AppState> for AdminUser {
     ) -> Result<Self, Self::Rejection> {
         let auth_user = AuthUser::from_request_parts(parts, state).await?;
 
-        let role: Option<(String,)> =
-            sqlx::query_as("SELECT role FROM user_profiles WHERE user_id = $1 LIMIT 1")
-                .bind(&auth_user.user_id)
-                .fetch_optional(&state.pool)
-                .await?;
-
-        match role {
-            Some((r,)) if r == "ADMIN" => Ok(AdminUser {
+        if auth_user.role.as_deref() == Some("ADMIN") {
+            Ok(AdminUser {
                 user_id: auth_user.user_id,
-            }),
-            _ => Err(AppError::Forbidden(
+            })
+        } else {
+            Err(AppError::Forbidden(
                 "Forbidden: Admin access required".to_string(),
-            )),
+            ))
         }
     }
 }
@@ -157,10 +256,8 @@ mod tests {
     use super::*;
     use axum::http::{Request, StatusCode};
     use axum::response::IntoResponse;
-    use dashmap::DashMap;
     use jsonwebtoken::{Algorithm, EncodingKey, Header, encode, jwk::Jwk};
     use serde::Serialize;
-    use std::sync::Arc;
 
     use crate::{config::Config, mq::EventProducer};
 
@@ -179,15 +276,10 @@ mod tests {
             EventProducer::connect("127.0.0.1:19999", "iggy", "iggy", pool.clone()).await;
         let mut config = Config::from_env();
         config.neon_auth_jwks_url = String::new();
+        config.neon_auth_issuer = String::new();
+        config.neon_auth_audience = String::new();
 
-        AppState {
-            pool,
-            config,
-            http_client: reqwest::Client::new(),
-            jwks_cache: Arc::new(DashMap::new()),
-            pill_cache: moka::future::Cache::builder().max_capacity(10).build(),
-            producer,
-        }
+        AppState::new(pool, config, producer)
     }
 
     #[tokio::test]
@@ -216,7 +308,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_auth_user_rejects_expired_and_forged_jwt_with_jwk() {
+    async fn test_auth_user_rejects_expired_forged_and_alg_mismatched_jwt_with_jwk() {
         let state = make_test_state().await;
 
         // HS256 테스트용 JWK 등록
@@ -268,6 +360,27 @@ mod tests {
 
         let req = Request::builder()
             .header(AUTHORIZATION, format!("Bearer {forged_token}"))
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (mut parts, _) = req.into_parts();
+        let err = AuthUser::from_request_parts(&mut parts, &state)
+            .await
+            .unwrap_err();
+        assert_eq!(err.into_response().status(), StatusCode::UNAUTHORIZED);
+
+        // JWK alg(HS256)와 다른 alg(HS512) 헤더를 가진 토큰 거부
+        let mut mismatch_header = Header::new(Algorithm::HS512);
+        mismatch_header.kid = Some("test-kid".to_string());
+        let mismatch_token = encode(
+            &mismatch_header,
+            &forged_claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+
+        let req = Request::builder()
+            .header(AUTHORIZATION, format!("Bearer {mismatch_token}"))
             .uri("/")
             .body(())
             .unwrap();

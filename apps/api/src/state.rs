@@ -1,9 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use dashmap::DashMap;
 use jsonwebtoken::jwk::Jwk;
 use moka::future::Cache;
 use sqlx::PgPool;
+use tokio::sync::Mutex;
 
 use crate::{config::Config, db::PillCatalog, mq::EventProducer};
 
@@ -18,6 +22,8 @@ pub struct AppState {
     pub pill_cache: Cache<String, Vec<PillCatalog>>,
     /// JWKS 공개키 캐시 (kid -> Jwk)
     pub jwks_cache: Arc<DashMap<String, Jwk>>,
+    /// JWKS 원격 조회 Singleflight 및 쿨다운 제어용 락 (마지막 조회 시도 시각)
+    pub jwks_refresh_lock: Arc<Mutex<Option<Instant>>>,
 }
 
 impl AppState {
@@ -33,6 +39,7 @@ impl AppState {
                 .time_to_live(Duration::from_secs(600))
                 .build(),
             jwks_cache: Arc::new(DashMap::new()),
+            jwks_refresh_lock: Arc::new(Mutex::new(None)),
         }
     }
 }

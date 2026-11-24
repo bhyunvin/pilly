@@ -45,14 +45,25 @@ pub fn router() -> Router<AppState> {
         .route("/chat/{sessionId}", get(get_jit_chat_logs))
 }
 
-/// 의약품 데이터 동기화 트리거 (x-admin-key 헤더 검증)
+/// 타이밍 공격을 방지하기 위한 상수 시간 바이트 슬라이스 비교 함수
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len()
+        && a.iter()
+            .zip(b.iter())
+            .fold(0u8, |diff, (x, y)| diff | (x ^ y))
+            == 0
+}
+
+/// 의약품 데이터 동기화 트리거 (x-admin-key 헤더 상수 시간 검증)
 async fn sync_pills(State(state): State<AppState>, headers: HeaderMap) -> AppResult<Json<Value>> {
     let client_key = headers
         .get("x-admin-key")
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
 
-    if state.config.admin_api_key.is_empty() || client_key != state.config.admin_api_key {
+    if state.config.admin_api_key.is_empty()
+        || !constant_time_eq(client_key.as_bytes(), state.config.admin_api_key.as_bytes())
+    {
         return Err(AppError::Unauthorized("Unauthorized".to_string()));
     }
 

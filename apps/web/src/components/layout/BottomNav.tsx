@@ -1,13 +1,13 @@
 'use client';
 
-import { Home, MessageCircle, Search, User } from 'lucide-react';
+import { HelpCircle, Home, MessageCircle, Pill, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 /**
  * @description 모바일 환경에서 하단에 고정되어 주요 페이지 간 이동을 돕는 내비게이션 바입니다.
- * 홈, 검색, 채팅, 프로필 등 주요 서비스 섹션으로의 링크를 제공하며 현재 활성화된 페이지를 시각적으로 강조합니다.
+ * 홈, 검색, 복약, 채팅, 문의, 프로필 메뉴를 제공하며 현재 활성화된 페이지를 시각적으로 강조합니다.
  *
  * @returns 아이콘과 라벨로 구성된 하단 내비게이션 바를 반환합니다.
  */
@@ -17,12 +17,17 @@ export function BottomNav() {
   const navItems = [
     { label: '홈', icon: Home, href: '/' },
     { label: '검색', icon: Search, href: '/search' },
+    { label: '복약', icon: Pill, href: '/medications' },
     { label: '채팅', icon: MessageCircle, href: '/chat' },
+    { label: '문의', icon: HelpCircle, href: '/inquiry' },
     { label: '프로필', icon: User, href: '/profile' },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 z-50 w-full bg-background border-t md:hidden min-h-16 pb-[env(safe-area-inset-bottom)]">
+    <nav
+      className="fixed bottom-0 left-0 z-50 w-full bg-background border-t md:hidden min-h-16 pb-[env(safe-area-inset-bottom)]"
+      aria-label="모바일 하단 메뉴"
+    >
       <div className="flex h-16 items-center justify-around">
         {navItems.map(({ label, icon: Icon, href }) => {
           const isActive = pathname === href;
